@@ -5,12 +5,6 @@ on:
     # Every 5 minutes — processes one queue item per execution
     - cron: '*/5 * * * *'
   workflow_dispatch:
-    inputs:
-      dry_run_override:
-        description: 'Force dry-run regardless of INSTAGRAM_API_ENABLED variable'
-        required: false
-        default: 'false'
-        type: boolean
 
 jobs:
   publish:
@@ -40,7 +34,7 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           # Set to "true" in GitHub Variables to enable live publishing.
           # Defaults to dry-run if not set.
-          INSTAGRAM_API_ENABLED: ${{ secrets.INSTAGRAM_API_ENABLED }}
+          INSTAGRAM_API_ENABLED: ${{ vars.INSTAGRAM_API_ENABLED }}
         run: |
           echo "InstaAutoPost Publisher — starting"
           python scripts/instaautopost_publisher.py
