@@ -8,7 +8,10 @@ import {
   ClipboardList,
   Settings,
   Zap,
+  LogOut,
 } from 'lucide-react'
+import { useAuth } from '../lib/auth'
+import { supabase } from '../lib/supabase'
 
 const NAV = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -21,6 +24,8 @@ const NAV = [
 ]
 
 export default function Sidebar() {
+  const { user } = useAuth()
+
   return (
     <aside className="w-60 shrink-0 bg-slate-900 flex flex-col h-screen sticky top-0">
       {/* Brand */}
@@ -57,9 +62,24 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* Footer */}
-      <div className="px-5 py-4 border-t border-slate-800">
-        <p className="text-slate-600 text-xs">v0.1.0</p>
+      {/* Footer — user + sign out */}
+      <div className="px-3 py-4 border-t border-slate-800">
+        {user && (
+          <div className="mb-3">
+            <p className="text-slate-400 text-xs truncate px-2 mb-1" title={user.email ?? ''}>
+              {user.email}
+            </p>
+            <button
+              type="button"
+              onClick={() => supabase.auth.signOut()}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-500 hover:text-red-400 hover:bg-slate-800 transition-colors"
+            >
+              <LogOut size={13} />
+              Sign out
+            </button>
+          </div>
+        )}
+        <p className="text-slate-600 text-xs px-2">v0.1.0</p>
       </div>
     </aside>
   )
