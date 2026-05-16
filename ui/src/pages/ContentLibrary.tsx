@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Upload, Plus, Archive } from 'lucide-react'
 import { format } from 'date-fns'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 import StatusPill from '../components/StatusPill'
 import type { ContentItem, ContentStatus } from '../lib/types'
 
@@ -14,6 +15,7 @@ const TABS: { label: string; value: ContentStatus | 'all' }[] = [
 ]
 
 export default function ContentLibrary() {
+  const { user } = useAuth()
   const [items, setItems] = useState<ContentItem[]>([])
   const [filter, setFilter] = useState<ContentStatus | 'all'>('all')
   const [loading, setLoading] = useState(true)
@@ -45,6 +47,7 @@ export default function ContentLibrary() {
     const { error: err } = await supabase.from('ig_publishing_queue').insert({
       content_id: item.id,
       queue_status: 'draft',
+      created_by: user?.id ?? null,
     })
     if (err) alert(`Error: ${err.message}`)
     else alert('Added to queue as draft. Open Publishing Queue to schedule it.')
@@ -72,6 +75,7 @@ export default function ContentLibrary() {
         <div className="flex gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {TABS.map(({ label, value }) => (
             <button
+              type="button"
               key={value}
               onClick={() => setFilter(value)}
               className={[
@@ -130,6 +134,7 @@ export default function ContentLibrary() {
                       <div className="flex items-center gap-2">
                         {item.content_status === 'draft' && (
                           <button
+                            type="button"
                             onClick={() => handleApprove(item.id)}
                             className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
                           >
@@ -138,6 +143,7 @@ export default function ContentLibrary() {
                         )}
                         {item.content_status === 'approved' && (
                           <button
+                            type="button"
                             onClick={() => handleAddToQueue(item)}
                             className="text-xs text-violet-600 hover:text-violet-700 font-medium"
                           >
@@ -146,6 +152,7 @@ export default function ContentLibrary() {
                         )}
                         {item.content_status !== 'archived' && (
                           <button
+                            type="button"
                             onClick={() => handleArchive(item.id)}
                             className="text-xs text-slate-400 hover:text-slate-600"
                             title="Archive"

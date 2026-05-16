@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Video, CheckCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth'
 
 interface FormData {
   title: string
@@ -25,6 +26,7 @@ const DEFAULTS: FormData = {
 
 export default function UploadVideo() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [form, setForm] = useState<FormData>(DEFAULTS)
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -59,6 +61,7 @@ export default function UploadVideo() {
       duration_seconds: form.duration_seconds ? parseInt(form.duration_seconds, 10) : null,
       media_type: form.media_type,
       content_status: 'draft',
+      created_by: user?.id ?? null,
     })
 
     if (err) {
