@@ -33,22 +33,25 @@ InstaAutoPost/
 
 ## Quick Start
 
-### 1. Apply Supabase Migration
+### 1. Apply Supabase Migrations
+
+Both the schema and dev RLS policies are applied through migrations in `supabase/migrations/`:
+
+- `20260516000000_create_instaautopost_schema.sql` — tables, indexes, enums, RPC function
+- `20260516001000_add_instaautopost_dev_rls_policies.sql` — dev RLS policies (authenticated users)
 
 ```bash
-# Via Supabase CLI
+# Via Supabase CLI (applies all pending migrations in order)
 supabase db push
 
-# Or via Supabase Dashboard SQL editor — paste the migration file contents
+# Or via Supabase Dashboard SQL editor — apply each file in order
 ```
 
-### 2. Apply RLS Policies (dev)
+> **UI Note**: Dev RLS policies target the `authenticated` role. The UI requires an active
+> Supabase session (a logged-in user) to read or write any data. Without auth, the browser
+> client will see empty results or permission errors.
 
-```bash
-# Paste supabase/policies/instaautopost_dev_rls_policies.sql into Supabase SQL editor
-```
-
-### 3. Run the UI Locally
+### 2. Run the UI Locally
 
 ```bash
 cd ui
@@ -58,7 +61,10 @@ npm install
 npm run dev
 ```
 
-### 4. Run the Worker (Dry Run)
+### 3. Run the Worker (Dry Run)
+
+The worker uses the service role key and bypasses RLS — it can be tested without a UI
+session as long as seed rows exist in `ig_publishing_queue`.
 
 ```bash
 cd scripts
@@ -69,7 +75,7 @@ export SUPABASE_SERVICE_ROLE_KEY=your_key
 python instaautopost_publisher.py
 ```
 
-### 5. Run the Worker (Live)
+### 4. Run the Worker (Live)
 
 ```bash
 export INSTAGRAM_API_ENABLED=true

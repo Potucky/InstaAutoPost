@@ -229,6 +229,13 @@ COMMENT ON FUNCTION public.claim_next_queue_item IS
 REVOKE EXECUTE ON FUNCTION public.claim_next_queue_item(TEXT) FROM PUBLIC;
 GRANT  EXECUTE ON FUNCTION public.claim_next_queue_item(TEXT) TO   service_role;
 
+-- Defense-in-depth: explicit per-role revokes in case a future migration
+-- accidentally re-grants EXECUTE to a specific role.
+-- REVOKE FROM PUBLIC above already covers both, but naming them explicitly
+-- ensures the intent is unambiguous.
+REVOKE EXECUTE ON FUNCTION public.claim_next_queue_item(TEXT) FROM anon;
+REVOKE EXECUTE ON FUNCTION public.claim_next_queue_item(TEXT) FROM authenticated;
+
 -- ---------------------------------------------------------------------------
 -- Row Level Security
 -- ---------------------------------------------------------------------------

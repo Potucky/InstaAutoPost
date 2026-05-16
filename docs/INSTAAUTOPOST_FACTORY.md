@@ -186,6 +186,19 @@ All tables are designed for simple Supabase client queries from the UI:
 
 ---
 
+## Dev Setup
+
+The full dev environment is applied through two migrations in `supabase/migrations/`:
+
+1. `20260516000000_create_instaautopost_schema.sql` — tables, enums, indexes, RPC function, RLS enabled
+2. `20260516001000_add_instaautopost_dev_rls_policies.sql` — dev RLS policies for the `authenticated` role
+
+Run `supabase db push` to apply both. There is no separate manual step for RLS policies.
+
+`supabase/policies/instaautopost_dev_rls_policies.sql` is kept as a human-readable reference only — do not apply it directly.
+
+---
+
 ## Environment Variables
 
 ### Worker — GitHub Actions Secrets
@@ -216,7 +229,7 @@ All tables are designed for simple Supabase client queries from the UI:
 
 ## Security Model
 
-- **Frontend** uses `anon` key + RLS policies. Dev policies allow all authenticated users. Production policies should restrict to `auth.uid() = created_by`.
-- **Worker** uses `service_role` key, which bypasses RLS. It runs in GitHub Actions (trusted environment).
-- **Row locking** via `claim_next_queue_item()` PostgreSQL function prevents duplicate publishing.
+- **Frontend** uses `anon` key + RLS policies. Dev policies target the `authenticated` role — the UI requires an active Supabase session (logged-in user) to read or write any data. Without auth, the browser client will see empty results or permission errors. Production policies should restrict to `auth.uid() = created_by`.
+- **Worker** uses `service_role` key, which bypasses RLS. It runs in GitHub Actions (trusted environment). Worker dry-run mode can be tested without a UI auth session as long as seed rows exist in the database and `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set.
+- **Row locking** via `claim_next_queue_item()` PostgreSQL function prevents duplicate publishing. Execute is restricted to `service_role`; `anon` and `authenticated` are explicitly denied.
 - **Completion guards**: worker checks `published_at IS NULL` and `external_media_id IS NULL` before any API call.
