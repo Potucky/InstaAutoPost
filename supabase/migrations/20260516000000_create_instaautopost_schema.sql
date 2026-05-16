@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS public.ig_publishing_queue (
   id                UUID              PRIMARY KEY DEFAULT uuid_generate_v4(),
   content_id        UUID              NOT NULL REFERENCES public.ig_content_library(id) ON DELETE CASCADE,
   queue_status      public.queue_status NOT NULL DEFAULT 'draft',
-  scheduled_at      TIMESTAMPTZ,
+  scheduled_at      TIMESTAMPTZ       NOT NULL DEFAULT NOW(),
   published_at      TIMESTAMPTZ,
   external_media_id TEXT,
   attempt_count     INTEGER           NOT NULL DEFAULT 0,
