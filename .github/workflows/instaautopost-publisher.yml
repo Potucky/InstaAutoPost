@@ -1,0 +1,47 @@
+name: InstaAutoPost Publisher
+
+on:
+  schedule:
+    # Every 5 minutes — processes one queue item per execution
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run_override:
+        description: 'Force dry-run regardless of INSTAGRAM_API_ENABLED variable'
+        required: false
+        default: 'false'
+        type: boolean
+
+jobs:
+  publish:
+    name: InstaAutoPost Publisher Worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+          cache-dependency-path: scripts/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r scripts/requirements.txt
+
+      - name: Run InstaAutoPost Publisher Worker
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          # Set to "true" in GitHub Variables to enable live publishing.
+          # Defaults to dry-run if not set.
+          INSTAGRAM_API_ENABLED: ${{ secrets.INSTAGRAM_API_ENABLED }}
+        run: |
+          echo "InstaAutoPost Publisher — starting"
+          python scripts/instaautopost_publisher.py
+          echo "InstaAutoPost Publisher — done"
