@@ -102,7 +102,7 @@ Fields:
 - `container_id`: Instagram container ID (live mode)
 - `media_id`: Instagram media ID (on success)
 - `duration_ms`: end-to-end processing time
-- `response_data`: raw Instagram API response (JSONB)
+- `response_data`: safe response metadata — IDs and status codes only (JSONB)
 - `worker_version`: for tracing across worker deployments
 
 ### 8. Supabase-First Architecture
@@ -176,7 +176,7 @@ All tables are designed for simple Supabase client queries from the UI:
 | `attempted_at` | TIMESTAMPTZ | When the attempt started |
 | `attempt_number` | INTEGER | Attempt sequence number |
 | `status` | ENUM | `success / failed / dry_run` |
-| `response_data` | JSONB | Raw API response |
+| `response_data` | JSONB | Safe response metadata (IDs, status codes) |
 | `error_message` | TEXT | Error details |
 | `container_id` | TEXT | Instagram container ID |
 | `media_id` | TEXT | Instagram media ID |
@@ -188,7 +188,7 @@ All tables are designed for simple Supabase client queries from the UI:
 
 ## Environment Variables
 
-### Worker (GitHub Actions Secrets)
+### Worker — GitHub Actions Secrets
 
 | Name | Required | Description |
 |------|----------|-------------|
@@ -196,7 +196,12 @@ All tables are designed for simple Supabase client queries from the UI:
 | `SUPABASE_SERVICE_ROLE_KEY` | Yes | Service role key |
 | `IG_USER_ID` | Live only | Instagram Business User ID |
 | `IG_ACCESS_TOKEN` | Live only | Long-lived access token |
-| `INSTAGRAM_API_ENABLED` | No | `true` to enable live publishing (default: dry-run) |
+
+### Worker — GitHub Actions Variables
+
+| Name                    | Required | Description                                         |
+|-------------------------|----------|-----------------------------------------------------|
+| `INSTAGRAM_API_ENABLED` | No       | `true` to enable live publishing (default: dry-run) |
 
 ### UI (Browser)
 
