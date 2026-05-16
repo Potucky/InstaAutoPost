@@ -154,7 +154,7 @@ All tables are designed for simple Supabase client queries from the UI:
 | `id` | UUID | Primary key |
 | `content_id` | UUID | FK → ig_content_library |
 | `queue_status` | ENUM | `draft/scheduled/ready/processing/published/failed/cancelled/retry_scheduled` |
-| `scheduled_at` | TIMESTAMPTZ | Publish trigger time |
+| `scheduled_at` | TIMESTAMPTZ | Publish trigger time (NOT NULL, defaults to NOW()) |
 | `published_at` | TIMESTAMPTZ | Set on success only |
 | `external_media_id` | TEXT | Instagram media ID (completion proof) |
 | `attempt_count` | INTEGER | Times processing was attempted |
@@ -196,6 +196,20 @@ The full dev environment is applied through two migrations in `supabase/migratio
 Run `supabase db push` to apply both. There is no separate manual step for RLS policies.
 
 `supabase/policies/instaautopost_dev_rls_policies.sql` is kept as a human-readable reference only — do not apply it directly.
+
+### Local Dev Flow — Verified 2026-05-16
+
+The full UI flow was verified end-to-end locally:
+
+- Auth → Create content → Approve → Queue
+
+All three schema fixes below were required and are now reflected in the base migration:
+
+- `ig_content_library.media_type TEXT NOT NULL DEFAULT 'video'`
+- `ig_content_status` enum includes `'approved'`
+- `ig_publishing_queue.scheduled_at TIMESTAMPTZ NOT NULL DEFAULT NOW()`
+
+Worker dry-run environment was prepared (worker connects, claims a queue item, and exits cleanly). Live worker run against the Instagram API is the next step.
 
 ---
 
