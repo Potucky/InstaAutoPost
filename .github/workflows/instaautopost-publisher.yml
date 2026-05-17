@@ -1,9 +1,11 @@
 name: InstaAutoPost Publisher
 
 on:
-  schedule:
-    # Every 5 minutes — processes one queue item per execution
-    - cron: '*/5 * * * *'
+  # Automatic scheduling temporarily disabled to stop failure email spam.
+  # To restore: uncomment the schedule block below.
+  # schedule:
+  #   # Every 5 minutes — processes one queue item per execution
+  #   - cron: '*/5 * * * *'
   workflow_dispatch:
 
 jobs:
