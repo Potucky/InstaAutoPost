@@ -38,7 +38,7 @@ export interface QueueItem {
   attempt_count: number;
   max_attempts: number;
   next_retry_at: string | null;
-  error_message: string | null;
+  failure_reason: string | null;
   ig_user_id: string | null;
   notes: string | null;
   locked_at: string | null;

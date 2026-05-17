@@ -1,119 +1,125 @@
 # InstaAutoPost
 
-Instagram Autoposting Control Center — a production-grade backend publishing factory backed by Supabase.
+InstaAutoPost is a standalone Instagram autoposting control center backed by Supabase, a queue-based publishing worker, GitHub Actions automation, and the Instagram Graph API.
+
+It is not QA Automation, not QA Content Automation, and not an old Instagram project.
+
+## Start Here
+
+- `CLAUDE.md` - rules for Claude Code/Codex and safety-sensitive work.
+- `docs/PRODUCT_BLUEPRINT.md` - product vision and MVP scope.
+- `docs/ARCHITECTURE.md` - system architecture and data flow.
+- `docs/CONTROL_CENTER_REQUIREMENTS.md` - dashboard and UI requirements.
+- `docs/SUPABASE_SCHEMA.md` - schema contract and drift warnings.
+- `docs/PUBLISHING_WORKER.md` - worker behavior, dry-run/live mode, and first-run checklist.
+- `docs/INSTAGRAM_API_NOTES.md` - Instagram API safety notes.
+- `docs/ROADMAP.md` - active blockers and next milestones.
+- `docs/DECISIONS.md` - architecture decision log.
+
+`docs/INSTAAUTOPOST_FACTORY.md` is an earlier architecture reference. The files above are the active source-of-truth documentation set.
 
 ## Architecture
 
 | Layer | Component | Responsibility |
-|-------|-----------|----------------|
-| Database | Supabase (PostgreSQL) | Source of truth for all content and queue state |
-| UI | Vite + React + TypeScript | Manage content and queue records — never publishes |
-| Worker | `scripts/instaautopost_publisher.py` | Owns Instagram Graph API publishing |
-| Scheduler | GitHub Actions cron | Triggers worker every 5 minutes |
+| --- | --- | --- |
+| Frontend | Vite + React + TypeScript | Manage content, queue, calendar, and logs. Never publishes directly. |
+| Database | Supabase PostgreSQL | Source of truth for content, queue state, attempts, locks, and completion proof. |
+| Worker | `scripts/instaautopost_publisher.py` | Owns Instagram Graph API publishing. Dry-run by default. |
+| Automation | `.github/workflows/instaautopost-publisher.yml` | Manual worker execution. Automatic schedule is currently disabled. |
+| External API | Instagram Graph API | Receives live publish requests only when explicitly enabled. |
 
 ## Project Structure
 
-```
+```text
 InstaAutoPost/
-├── docs/
-│   └── INSTAAUTOPOST_FACTORY.md       # Full architecture reference
-├── scripts/
-│   ├── instaautopost_publisher.py     # Backend publisher worker
-│   └── requirements.txt
-├── supabase/
-│   ├── migrations/
-│   │   └── 20260516000000_create_instaautopost_schema.sql
-│   └── policies/
-│       └── instaautopost_dev_rls_policies.sql
-├── .github/
-│   └── workflows/
-│       └── instaautopost-publisher.yml
-└── ui/                                # Vite + React dashboard
+  CLAUDE.md
+  README.md
+  docs/
+    ARCHITECTURE.md
+    CONTROL_CENTER_REQUIREMENTS.md
+    DECISIONS.md
+    INSTAGRAM_API_NOTES.md
+    PRODUCT_BLUEPRINT.md
+    PUBLISHING_WORKER.md
+    ROADMAP.md
+    SUPABASE_SCHEMA.md
+  scripts/
+    instaautopost_publisher.py
+    requirements.txt
+  supabase/
+    migrations/
+    policies/
+  .github/
+    workflows/
+      instaautopost-publisher.yml
+  ui/
 ```
 
-## Quick Start
+## Current Status
 
-### 1. Apply Supabase Migrations
+Implemented:
 
-Both the schema and dev RLS policies are applied through migrations in `supabase/migrations/`:
+- React control center structure.
+- Supabase schema migrations and dev RLS policies.
+- Python publisher worker.
+- GitHub Actions workflow with manual dispatch.
+- Dry-run default controlled by `INSTAGRAM_API_ENABLED`.
+- Stale `processing` row recovery (migration 20260516002000).
+- Post-`media_id` atomic anchor preventing duplicate publishing.
+- Live env var validation before queue claim.
+- Signed URL and token log redaction.
+- Queue failure field is `failure_reason` (UI and worker aligned).
 
-- `20260516000000_create_instaautopost_schema.sql` — tables, indexes, enums, RPC function
-- `20260516001000_add_instaautopost_dev_rls_policies.sql` — dev RLS policies (authenticated users)
+Blocked before real Instagram publishing:
 
-```bash
-# Via Supabase CLI (applies all pending migrations in order)
-supabase db push
+- Migration 20260516002000 not yet applied to live Supabase.
+- Dry-run not yet confirmed on an intended queue row.
+- User has not confirmed a live publishing run.
 
-# Or via Supabase Dashboard SQL editor — apply each file in order
-```
-
-> **UI Note**: Dev RLS policies target the `authenticated` role. The UI requires an active
-> Supabase session (a logged-in user) to read or write any data. Without auth, the browser
-> client will see empty results or permission errors.
-
-### 2. Run the UI Locally
+## Running The UI
 
 ```bash
 cd ui
-cp .env.example .env.local
-# Fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
 npm install
 npm run dev
 ```
 
-### 3. Run the Worker (Dry Run)
+Required browser env vars:
 
-The worker uses the service role key and bypasses RLS — it can be tested without a UI
-session as long as seed rows exist in `ig_publishing_queue`.
+- `VITE_SUPABASE_URL`
+- `VITE_SUPABASE_ANON_KEY`
 
-```bash
-cd scripts
-pip install -r requirements.txt
-export SUPABASE_URL=your_url
-export SUPABASE_SERVICE_ROLE_KEY=your_key
-# INSTAGRAM_API_ENABLED is not set → dry-run mode
-python instaautopost_publisher.py
-```
+## Worker Dry-Run
 
-### 4. Run the Worker (Live)
+Dry-run does not call Instagram, but it does connect to Supabase and write/update queue and attempt records.
 
 ```bash
-export INSTAGRAM_API_ENABLED=true
-export IG_USER_ID=your_ig_user_id
-export IG_ACCESS_TOKEN=your_long_lived_token
-python instaautopost_publisher.py
+cd /Users/vasylpopovich/Projects/InstaAutoPost
+INSTAGRAM_API_ENABLED=false python3 scripts/instaautopost_publisher.py
 ```
 
-## Required Secrets / Variables
+Required worker env vars:
 
-### GitHub Actions Secrets
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-| Name | Type | Description |
-|------|------|-------------|
-| `SUPABASE_URL` | Secret | Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Secret | Service role key (backend only) |
-| `IG_USER_ID` | Secret | Instagram Business User ID |
-| `IG_ACCESS_TOKEN` | Secret | Long-lived Instagram access token |
-| `INSTAGRAM_API_ENABLED` | Variable | Set to `true` to enable live publishing |
+## Live Publishing
 
-### UI Environment Variables
+Do not run live publishing until the safety blockers in `docs/ROADMAP.md` and `docs/PUBLISHING_WORKER.md` are fixed and the user explicitly confirms a live run.
 
-| Name | Description |
-|------|-------------|
-| `VITE_SUPABASE_URL` | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Supabase anon key (public, safe for browser) |
+Live mode is gated by:
 
-> **Security**: The service role key is never used in the frontend. Only the anon key is used in the browser.
+```text
+INSTAGRAM_API_ENABLED=true
+```
 
-## Known TODOs
+Live-only env vars:
 
-- [ ] Add Supabase Auth (login page, user sessions)
-- [ ] Restrict RLS policies to `auth.uid()` owner checks for production
-- [ ] Add Instagram token refresh automation
-- [ ] Add video file upload to Supabase Storage (currently uses external video URLs)
-- [ ] Add thumbnail generation
-- [ ] Add Slack/webhook notifications on publish success/failure
-- [ ] Add analytics charts to Dashboard
-- [ ] Add bulk scheduling from Content Library
-- [ ] Add calendar drag-and-drop rescheduling
-- [ ] Add rate limiting guard (Instagram API limits)
+- `IG_USER_ID`
+- `IG_ACCESS_TOKEN`
+
+## Automation
+
+The GitHub Actions workflow keeps manual `workflow_dispatch`.
+
+Automatic cron scheduling is currently commented out in `.github/workflows/instaautopost-publisher.yml` to stop failure email spam. Restore it only after safety blockers are resolved and the user explicitly asks.
