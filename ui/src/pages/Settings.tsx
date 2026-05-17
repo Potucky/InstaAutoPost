@@ -53,7 +53,8 @@ export default function Settings() {
             <p>
               The UI manages content and queue records only. All Instagram API publishing is handled exclusively
               by the backend worker (<code className="font-mono bg-violet-100 px-1 rounded">scripts/instaautopost_publisher.py</code>),
-              triggered by GitHub Actions on a 5-minute cron schedule.
+              triggered manually via GitHub Actions (automatic cron schedule is currently disabled).
+              Dry-run is the default. Live publishing requires explicit configuration.
               The service role key never leaves the backend.
             </p>
           </div>
@@ -149,8 +150,8 @@ export default function Settings() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
             {[
               { label: 'Worker script', value: 'scripts/instaautopost_publisher.py' },
-              { label: 'Worker version', value: '1.0.0' },
-              { label: 'Schedule', value: 'Every 5 minutes (GitHub Actions cron)' },
+              { label: 'Worker version', value: '1.2.0' },
+              { label: 'Schedule', value: 'Manual only (automatic cron disabled)' },
               { label: 'Items per run', value: 'Exactly 1 queue item' },
               { label: 'Default mode', value: 'Dry-run (safe)' },
               { label: 'Lock mechanism', value: 'FOR UPDATE SKIP LOCKED (PostgreSQL)' },

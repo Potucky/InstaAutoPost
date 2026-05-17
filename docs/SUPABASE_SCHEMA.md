@@ -11,7 +11,7 @@ Repo drift resolved (migration 20260516002000):
 - Worker and UI both use `failure_reason` for queue-level failure state.
 - `error_message` remains valid only on `ig_publish_attempts`.
 
-Remaining blocker: migration 20260516002000 has not yet been applied to the live Supabase instance. Treat unapplied migration as a blocker before live publishing.
+Migration 20260516002000 exists in repo and has been applied during dev/local verification. Confirm it is applied to the production Supabase instance before live publishing. Treat unconfirmed production state as a blocker before live publishing.
 
 ## Current Tables
 

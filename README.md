@@ -72,7 +72,7 @@ Implemented:
 
 Blocked before real Instagram publishing:
 
-- Migration 20260516002000 not yet applied to live Supabase.
+- Migration 20260516002000 applied in dev/local verification; production Supabase confirmation required.
 - Dry-run not yet confirmed on an intended queue row.
 - User has not confirmed a live publishing run.
 

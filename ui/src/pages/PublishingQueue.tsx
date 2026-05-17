@@ -53,17 +53,42 @@ export default function PublishingQueue() {
     load()
   }
 
-  async function handleCancel(id: string) {
+  async function handleCancel(item: QueueItem) {
     if (!confirm('Cancel this queue item?')) return
-    await supabase.from('ig_publishing_queue').update({ queue_status: 'cancelled' }).eq('id', id)
+    // Local guard: fast-fail before hitting the DB
+    if (item.external_media_id || item.published_at) return
+    if (!actionable(item.queue_status)) return
+    const { data } = await supabase
+      .from('ig_publishing_queue')
+      .update({ queue_status: 'cancelled' })
+      .eq('id', item.id)
+      .is('external_media_id', null)
+      .is('published_at', null)
+      .in('queue_status', ['draft', 'scheduled', 'ready', 'retry_scheduled', 'failed'])
+      .select()
+    if (!data || data.length === 0) {
+      console.warn(`handleCancel: no row updated for id=${item.id} — row state may have changed`)
+    }
     load()
   }
 
-  async function handleRetry(id: string) {
-    await supabase
+  async function handleRetry(item: QueueItem) {
+    // Local guard: fast-fail before hitting the DB
+    if (item.external_media_id || item.published_at) return
+    if (item.queue_status !== 'failed') return
+    if (item.attempt_count >= item.max_attempts) return
+    const { data } = await supabase
       .from('ig_publishing_queue')
       .update({ queue_status: 'retry_scheduled', next_retry_at: new Date().toISOString(), failure_reason: null })
-      .eq('id', id)
+      .eq('id', item.id)
+      .is('external_media_id', null)
+      .is('published_at', null)
+      .eq('queue_status', 'failed')
+      .lt('attempt_count', item.max_attempts)
+      .select()
+    if (!data || data.length === 0) {
+      console.warn(`handleRetry: no row updated for id=${item.id} — row state may have changed`)
+    }
     load()
   }
 
@@ -148,41 +173,53 @@ export default function PublishingQueue() {
                         ) : '—'}
                       </td>
                       <td className="table-td">
-                        <div className="flex items-center gap-2">
-                          {item.queue_status === 'draft' && (
-                            <button
-                              onClick={() => setSchedulingId(schedulingId === item.id ? null : item.id)}
-                              className="text-xs text-blue-600 hover:text-blue-700 font-medium"
-                            >
-                              Schedule
-                            </button>
-                          )}
-                          {item.queue_status === 'scheduled' && (
-                            <button
-                              onClick={() => handleMarkReady(item.id)}
-                              className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-                            >
-                              Mark Ready
-                            </button>
-                          )}
-                          {item.queue_status === 'failed' && item.attempt_count < item.max_attempts && (
-                            <button
-                              onClick={() => handleRetry(item.id)}
-                              className="text-xs text-orange-600 hover:text-orange-700 font-medium"
-                            >
-                              Retry
-                            </button>
-                          )}
-                          {actionable(item.queue_status) && (
-                            <button
-                              onClick={() => handleCancel(item.id)}
-                              className="text-slate-400 hover:text-red-500"
-                              title="Cancel"
-                            >
-                              <XCircle size={14} />
-                            </button>
-                          )}
-                        </div>
+                        {(() => {
+                          const hasProof = !!(item.external_media_id || item.published_at)
+                          if (hasProof && item.queue_status === 'failed') {
+                            return (
+                              <span className="text-xs text-amber-700 font-medium" title={`external_media_id: ${item.external_media_id ?? 'n/a'}`}>
+                                Published proof exists — manual reconciliation only
+                              </span>
+                            )
+                          }
+                          return (
+                            <div className="flex items-center gap-2">
+                              {item.queue_status === 'draft' && (
+                                <button
+                                  onClick={() => setSchedulingId(schedulingId === item.id ? null : item.id)}
+                                  className="text-xs text-blue-600 hover:text-blue-700 font-medium"
+                                >
+                                  Schedule
+                                </button>
+                              )}
+                              {item.queue_status === 'scheduled' && (
+                                <button
+                                  onClick={() => handleMarkReady(item.id)}
+                                  className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
+                                >
+                                  Mark Ready
+                                </button>
+                              )}
+                              {item.queue_status === 'failed' && !hasProof && item.attempt_count < item.max_attempts && (
+                                <button
+                                  onClick={() => handleRetry(item)}
+                                  className="text-xs text-orange-600 hover:text-orange-700 font-medium"
+                                >
+                                  Retry
+                                </button>
+                              )}
+                              {actionable(item.queue_status) && !hasProof && (
+                                <button
+                                  onClick={() => handleCancel(item)}
+                                  className="text-slate-400 hover:text-red-500"
+                                  title="Cancel"
+                                >
+                                  <XCircle size={14} />
+                                </button>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
                     </tr>
                     {schedulingId === item.id && (

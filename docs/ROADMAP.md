@@ -38,7 +38,7 @@ Fixed (worker v1.2.0 + migration 20260516002000):
 
 Remaining before first real publish:
 
-- Apply migration 20260516002000 to live Supabase.
+- Confirm migration 20260516002000 is applied to production Supabase (applied in dev/local verification).
 - Run a dry-run against a known safe queue row and verify the attempt log.
 - Confirm `claim_next_queue_item` executes cleanly under the service role.
 - Get explicit user confirmation for the live publish.
@@ -49,7 +49,7 @@ Known edge case (not blocking dry-run):
 
 ## Immediate Next Steps
 
-1. Apply migration 20260516002000 to live Supabase.
+1. Confirm migration 20260516002000 is applied to production Supabase.
 2. Run dry-run manually against a known safe queue item.
 3. Review database state after dry-run (attempt log written, row reset to `scheduled`).
 4. Only then request explicit confirmation for a live publish.
