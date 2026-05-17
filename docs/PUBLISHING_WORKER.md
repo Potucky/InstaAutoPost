@@ -28,8 +28,9 @@ Live gate:
 
 Behavior:
 
-- Any value other than exact lowercase `true` after trimming means dry-run mode.
-- `INSTAGRAM_API_ENABLED=true` enables live mode.
+- The value is trimmed and lowercased before comparison. Any value that does not lowercase to `true` means dry-run mode.
+- `INSTAGRAM_API_ENABLED=true` (or `TRUE`, `True`) enables live mode.
+- Recommended safety value when not publishing: set to `false` or leave unset.
 
 Do not print values for secrets or tokens.
 
@@ -230,7 +231,8 @@ Do not re-enable automatic schedule until the user asks and safety blockers are 
 - [x] Live env vars validated before queue claim — worker exits before claiming if vars are missing.
 - [x] Post-`media_id` DB failure cannot cause retry — split exception handling prevents retry after confirmed publish.
 - [x] Signed URL query params are redacted in logs — `_redact_url()` strips query strings before logging.
-- [ ] Migration 20260516002000 applied to live Supabase.
+- [x] Migration 20260516002000 exists in repo and applied during dev/local verification.
+- [ ] Migration 20260516002000 confirmed applied in production Supabase instance.
 - [ ] Dry-run succeeds on the intended queue row.
-- [ ] Workflow schedule state is intentional.
+- [ ] Workflow schedule state is intentional (automatic cron is currently disabled).
 - [ ] User explicitly confirms live publishing.
