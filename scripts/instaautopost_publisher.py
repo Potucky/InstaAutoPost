@@ -162,18 +162,27 @@ def _anchor_media_id(
     """
     now = datetime.now(timezone.utc).isoformat()
     try:
+        # Set external_media_id AND published_at together to satisfy the
+        # chk_published_proof constraint (both must be null or both non-null).
+        # queue_status='published' and cleared lock fields make the row terminal
+        # so no future worker run can reclaim it even if mark_published() fails.
         supabase.table("ig_publishing_queue").update({
             "external_media_id": media_id,
+            "published_at": now,
+            "queue_status": "published",
+            "failure_reason": None,
+            "locked_at": None,
+            "locked_by": None,
             "worker_metadata": {
                 "post_publish_reconciliation": True,
                 "media_id_anchored_at": now,
-                "status": "media_id_received_pending_final_db_write",
+                "status": "published_state_anchored",
             },
             "updated_at": now,
         }).eq("id", queue_id).execute()
         log.info(
-            f"Anchored external_media_id={media_id} on queue_id={queue_id} "
-            f"— duplicate publish protection active"
+            f"Anchored external_media_id={media_id} published_at={now} on queue_id={queue_id} "
+            f"— row is terminal, duplicate publish protection active"
         )
     except Exception as anchor_exc:
         error_str = _redact(str(anchor_exc), access_token)

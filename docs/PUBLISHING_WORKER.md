@@ -56,19 +56,20 @@ Dry-run still changes Supabase state temporarily and writes an attempt record.
 
 ## Live Behavior
 
-Current intent:
+Implemented:
 
 ```text
 connect to Supabase
+validate IG_USER_ID and IG_ACCESS_TOKEN (exit before claim if missing)
 claim one due queue row
 fetch content
-validate IG_USER_ID and IG_ACCESS_TOKEN
 create media container
 poll container status
 publish media container
 receive media_id
+anchor external_media_id + published_at atomically (_anchor_media_id)
 write success attempt
-mark queue row published
+mark queue row published (final confirmation write)
 ```
 
 ## Queue Claim Behavior
@@ -142,7 +143,7 @@ Failure before `media_id`:
 
 Failure after `media_id` (implemented):
 
-- Immediately after `ig_publish()` returns `media_id`, `_anchor_media_id()` writes `external_media_id` and a `post_publish_reconciliation` marker to `worker_metadata` on the queue row.
+- Immediately after `ig_publish()` returns `media_id`, `_anchor_media_id()` atomically writes `external_media_id`, `published_at`, `queue_status = 'published'`, and a `post_publish_reconciliation` marker to `worker_metadata`. Both completion proof fields are set together to satisfy the `chk_published_proof` schema constraint.
 - `claim_next_queue_item` filters `WHERE external_media_id IS NULL`, so once anchored the row cannot be reclaimed and re-published — even if `write_attempt()` or `mark_published()` fail afterward.
 - If `_anchor_media_id()` itself fails, the worker attempts a fallback to `queue_status = 'failed'` (which also excludes the row from the claim eligibility set), logs CRITICAL, and exits without scheduling a retry.
 - If both anchor and fallback fail, the row may be reclaimed after the lock expires. This is logged as CRITICAL and requires immediate operator action.

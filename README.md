@@ -64,14 +64,17 @@ Implemented:
 - Python publisher worker.
 - GitHub Actions workflow with manual dispatch.
 - Dry-run default controlled by `INSTAGRAM_API_ENABLED`.
+- Stale `processing` row recovery (migration 20260516002000).
+- Post-`media_id` atomic anchor preventing duplicate publishing.
+- Live env var validation before queue claim.
+- Signed URL and token log redaction.
+- Queue failure field is `failure_reason` (UI and worker aligned).
 
 Blocked before real Instagram publishing:
 
-- Stale `processing` row recovery.
-- Post-`media_id` failure handling to prevent duplicate publishing.
-- Live env var validation before queue claim.
-- Signed URL log redaction.
-- Migration alignment with the live Supabase queue schema.
+- Migration 20260516002000 not yet applied to live Supabase.
+- Dry-run not yet confirmed on an intended queue row.
+- User has not confirmed a live publishing run.
 
 ## Running The UI
 

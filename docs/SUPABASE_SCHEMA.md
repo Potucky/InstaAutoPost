@@ -4,15 +4,14 @@
 
 This file documents the expected schema contract for InstaAutoPost. The live Supabase schema is the operational source of truth. Repo migrations must be kept aligned with the live database before real Instagram publishing.
 
-Known drift to resolve:
+Repo drift resolved (migration 20260516002000):
 
-- The repo migration currently defines `ig_publishing_queue.error_message`.
-- The known live queue schema uses `failure_reason` and `worker_metadata`.
-- The publisher worker currently writes `failure_reason` on `ig_publishing_queue`.
-- Do not write `error_message` to `ig_publishing_queue`.
-- `error_message` may exist on `ig_publish_attempts`.
+- `ig_publishing_queue.error_message` is dropped in migration 20260516002000.
+- `ig_publishing_queue.failure_reason` and `worker_metadata` are added in migration 20260516002000.
+- Worker and UI both use `failure_reason` for queue-level failure state.
+- `error_message` remains valid only on `ig_publish_attempts`.
 
-Treat schema drift as an active blocker before live publishing.
+Remaining blocker: migration 20260516002000 has not yet been applied to the live Supabase instance. Treat unapplied migration as a blocker before live publishing.
 
 ## Current Tables
 
@@ -80,7 +79,7 @@ Repo migration currently also includes:
 | `notes` | Present in migration. |
 | `created_by` | Present in migration. |
 | `created_at` | Present in migration. |
-| `error_message` | Drift: must not be used for queue failure state. |
+| `error_message` | Removed from queue table by migration 20260516002000. |
 
 Required rule:
 

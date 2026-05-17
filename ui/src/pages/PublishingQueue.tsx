@@ -62,7 +62,7 @@ export default function PublishingQueue() {
   async function handleRetry(id: string) {
     await supabase
       .from('ig_publishing_queue')
-      .update({ queue_status: 'retry_scheduled', next_retry_at: new Date().toISOString(), error_message: null })
+      .update({ queue_status: 'retry_scheduled', next_retry_at: new Date().toISOString(), failure_reason: null })
       .eq('id', id)
     load()
   }
@@ -141,9 +141,9 @@ export default function PublishingQueue() {
                         </span>
                       </td>
                       <td className="table-td max-w-[180px]">
-                        {item.error_message ? (
-                          <span className="text-xs text-red-500 truncate block" title={item.error_message}>
-                            {item.error_message.slice(0, 60)}{item.error_message.length > 60 ? '…' : ''}
+                        {item.failure_reason ? (
+                          <span className="text-xs text-red-500 truncate block" title={item.failure_reason}>
+                            {item.failure_reason.slice(0, 60)}{item.failure_reason.length > 60 ? '…' : ''}
                           </span>
                         ) : '—'}
                       </td>

@@ -110,7 +110,7 @@ scheduled
   -> failed
 ```
 
-The schema also contains `draft`, `ready`, and `cancelled` states in the repo migration. The claim function currently considers `ready`, `scheduled`, and `retry_scheduled` actionable.
+The schema also contains `draft`, `ready`, and `cancelled` states in the repo migration. The claim function (updated in migration 20260516002000) considers `ready`, `scheduled`, `retry_scheduled`, and stale `processing` rows (lock older than 10 minutes) actionable.
 
 ## Dry-Run Flow
 
@@ -133,22 +133,23 @@ Dry-run must not call Instagram. It may still write to Supabase and adjust queue
 ```text
 Start worker
   -> connect to Supabase
+  -> validate IG_USER_ID and IG_ACCESS_TOKEN (exit before claim if missing)
   -> claim one due queue item
   -> fetch linked content
-  -> require IG_USER_ID and IG_ACCESS_TOKEN
   -> create Instagram media container
   -> poll container until FINISHED
   -> publish media container
   -> receive media_id
+  -> anchor external_media_id + published_at atomically (_anchor_media_id)
   -> record attempt
-  -> mark queue published with published_at and external_media_id
+  -> mark queue published (final confirmation write)
 ```
 
-Active safety concern: live environment variables should be validated before claiming a queue row, so a missing `IG_USER_ID` or `IG_ACCESS_TOKEN` cannot leave a row stuck in `processing`.
+Implemented: live environment variables are validated in `main()` before `claim_queue_item()` is called. A misconfigured worker exits without touching any queue row.
 
 ## Failure And Retry Flow
 
-Current worker intent:
+Failure before `media_id`:
 
 ```text
 failure before media_id
@@ -157,15 +158,17 @@ failure before media_id
   -> else: failed
 ```
 
-Required safety improvement:
+Implemented: failure after `media_id` returned by Instagram:
 
 ```text
 media_id returned by Instagram
-  -> do not schedule retry on later DB/logging failure
-  -> mark as manual reconciliation needed or preserve completion proof
+  -> _anchor_media_id() atomically sets external_media_id + published_at + queue_status=published
+  -> claim_next_queue_item filters WHERE external_media_id IS NULL — row cannot be reclaimed
+  -> if anchor fails: fallback sets queue_status=failed, logs CRITICAL, exits
+  -> write_attempt() and mark_published() run after anchor (Phase 2 failures cannot cause retry)
 ```
 
-Once Instagram returns a real media ID, treating a later local error as retryable can create duplicate publishing risk.
+Once Instagram returns a real `media_id`, duplicate publish risk is eliminated by the atomic anchor write. Later local errors require manual reconciliation but never schedule a retry.
 
 ## Duplicate Publishing Protection Principles
 
