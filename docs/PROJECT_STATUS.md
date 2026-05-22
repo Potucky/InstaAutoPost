@@ -9,7 +9,7 @@ Current known status of the InstaAutoPost project. Updated from read-only local 
 ```
 Project:               InstaAutoPost
 Current branch:        agent/iap-001-orchestrator-bootstrap
-Last updated:          2026-05-22
+Last updated:          2026-05-22 (IAP-002 queued)
 
 Production status:
   Publishing:          DISABLED — scheduled cron commented out in workflow
@@ -37,7 +37,8 @@ Known blockers:
 
 Agent workflow:
   IAP-001:             DONE — Orchestrator bootstrap complete, Codex PASS received.
-  Next task:           IAP-002 (to be defined)
+  IAP-002:             TODO — Read-only audit of current InstaAutoPost pipeline.
+  Next task:           IAP-002
   Queue file:          docs/AGENT_TASK_QUEUE.md
   Run reports:         docs/AGENT_RUN_REPORT.md
   Review rules:        docs/AGENT_REVIEW_RULES.md

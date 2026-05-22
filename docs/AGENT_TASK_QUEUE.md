@@ -62,6 +62,60 @@ Final status:         <set after Codex review>
 
 ## Task Queue
 
+### IAP-002 — Read-only audit of current InstaAutoPost pipeline
+
+```
+Task ID:      IAP-002
+Title:        Read-only audit of current InstaAutoPost pipeline
+Status:       TODO
+Owner Agent:  Claude Code (executor) + Codex (reviewer)
+Branch:       agent/iap-001-orchestrator-bootstrap
+Goal:         Produce a thorough read-only audit of the current InstaAutoPost
+              pipeline before any implementation changes begin. The audit must
+              surface: project structure, GitHub Actions workflows, Instagram
+              publish flow, Supabase usage and schema assumptions,
+              environment/secrets assumptions, dry-run/safe mode behavior, log
+              and secret exposure risks, production publish risks, old naming
+              drift, and the next safest implementation step. No code is changed.
+              The only output is a completed audit entry in docs/AGENT_RUN_REPORT.md.
+
+Scope:
+  - Read-only inspection of local project files
+  - Audit findings written to docs/AGENT_RUN_REPORT.md only
+  - No code, workflow, Supabase, UI, or package file changes
+
+Allowed files:
+  - docs/AGENT_RUN_REPORT.md
+
+Forbidden actions:
+  - No publish, deploy, supabase_write, migration_apply
+  - No secret_print, env_print, github_actions_run
+  - No commit, push, merge
+  - No write_app_code, write_workflow_code, write_supabase_code, write_ui_code
+  - No install_packages
+
+Validation commands:
+  - python3 scripts/potucky_orchestrator.py status
+  - python3 scripts/potucky_orchestrator.py doctor
+  - python3 scripts/potucky_orchestrator.py print-next
+  - git status --short
+
+Expected result:
+  - All validation commands exit 0
+  - git status shows only docs/AGENT_RUN_REPORT.md as modified (untracked is OK)
+  - docs/AGENT_RUN_REPORT.md contains a completed IAP-002 audit entry
+  - No secrets appear in any output
+
+Required run report:
+  - File: docs/AGENT_RUN_REPORT.md
+  - Fields: all — audit findings fill "What was done"
+
+Codex review result:  pending
+Final status:         pending
+```
+
+---
+
 ### IAP-001 — Orchestrator bootstrap and safety baseline
 
 ```

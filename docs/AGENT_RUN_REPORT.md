@@ -319,5 +319,63 @@ Codex review:
   Reviewed at:  pending
 
 Next recommended task:
-  IAP-002 — to be defined (add to scripts/potucky_agent_tasks.json)
+  IAP-002 — Read-only audit of current InstaAutoPost pipeline
+---
+
+---
+Task ID: IAP-002-QUEUE
+Branch: agent/iap-001-orchestrator-bootstrap
+Status: DONE
+Date: 2026-05-22
+
+Changed files:
+  - scripts/potucky_agent_tasks.json — added IAP-002 as first TODO task (read-only pipeline audit)
+  - docs/AGENT_TASK_QUEUE.md — added IAP-002 human-readable task block
+  - docs/PROJECT_STATUS.md — updated agent workflow section: IAP-002 TODO, Next task: IAP-002
+  - docs/AGENT_RUN_REPORT.md — appended this entry
+
+Commands run:
+  - python3 scripts/potucky_orchestrator.py status  →  exit 0, IAP-002 TODO shown as first active task
+  - python3 scripts/potucky_orchestrator.py doctor  →  exit 0, 2 task(s), all checks OK
+  - python3 scripts/potucky_orchestrator.py print-next  →  exit 0, recommends run-next for IAP-002
+  - git status --short  →  exit 0, only 3 allowed files modified
+
+What was done:
+  Added IAP-002 (read-only audit of current InstaAutoPost pipeline) as the next
+  queued TODO task. The task is insert-sorted first in the JSON array so it becomes
+  the first active task. Allowed files: docs/AGENT_RUN_REPORT.md only. Audit scope
+  covers project structure, GitHub Actions workflows, Instagram publish flow, Supabase
+  usage, environment/secrets assumptions, dry-run/safe mode behavior, log and secret
+  exposure risks, production publish risks, old naming drift, and next safest
+  implementation step. No code changes are permitted for this task.
+
+What was not done:
+  No publish, deploy, Supabase write, migration apply, GitHub Actions run, secrets
+  print, commit, push, merge, or package install was performed. No app code, workflow
+  code, UI, or package files were changed.
+
+Validation result:
+  All four validation commands exited 0. git status shows only the three allowed files
+  as modified. No secrets appeared in any output.
+
+Risks found:
+  - none [severity: N/A]
+
+Manual checks needed:
+  - Confirm IAP-002 allowed_files (docs/AGENT_RUN_REPORT.md only) is correct for a
+    pure read-only audit task where only the report is written.
+  - Confirm branch agent/iap-001-orchestrator-bootstrap is acceptable for IAP-002
+    (read-only, no code changes).
+
+Codex review:
+  Result:  N/A — queue management entry, not a code task
+  Blockers:
+    - none
+  Suggestions:
+    - none
+  Reviewed by:  N/A
+  Reviewed at:  N/A
+
+Next recommended task:
+  IAP-002 — Read-only audit of current InstaAutoPost pipeline
 ---

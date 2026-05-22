@@ -14,6 +14,46 @@
   ],
   "tasks": [
     {
+      "id": "IAP-002",
+      "title": "Read-only audit of current InstaAutoPost pipeline",
+      "status": "TODO",
+      "branch": "agent/iap-001-orchestrator-bootstrap",
+      "mode": "read_only",
+      "priority": "high",
+      "allowed_files": [
+        "docs/AGENT_RUN_REPORT.md"
+      ],
+      "forbidden_actions": [
+        "publish",
+        "deploy",
+        "supabase_write",
+        "migration_apply",
+        "secret_print",
+        "env_print",
+        "github_actions_run",
+        "commit",
+        "push",
+        "merge",
+        "write_app_code",
+        "write_workflow_code",
+        "write_supabase_code",
+        "write_ui_code",
+        "install_packages"
+      ],
+      "validation_commands": [
+        "python3 scripts/potucky_orchestrator.py status",
+        "python3 scripts/potucky_orchestrator.py doctor",
+        "python3 scripts/potucky_orchestrator.py print-next",
+        "git status --short"
+      ],
+      "done_requires": [
+        "executor_report",
+        "codex_review_pass",
+        "manual_approval_for_final_status"
+      ],
+      "notes": "Read-only pipeline audit. No code changes allowed — only docs/AGENT_RUN_REPORT.md may be written. Audit must cover: project structure, GitHub Actions workflows (instaautopost-publisher.yml), Instagram publish flow (scripts/instaautopost_publisher.py), Supabase usage and schema assumptions, environment/secrets assumptions, dry-run/safe mode behavior, logs and secret exposure risks, production publish risks, old naming drift, and next safest implementation step. Do not connect to live services. Read local files only using safe commands (cat, grep, find, git). Do not print secrets, tokens, or .env values."
+    },
+    {
       "id": "IAP-001",
       "title": "Read-only safety baseline",
       "status": "DONE",
