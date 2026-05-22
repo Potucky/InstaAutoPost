@@ -1,0 +1,62 @@
+{
+  "orchestrator_name": "POTUCKY ORCHESTRATOR",
+  "version": "0.1.0",
+  "approval_required_for": [
+    "publish",
+    "deploy",
+    "supabase_migration",
+    "destructive_sql",
+    "github_actions_cron",
+    "commit",
+    "push",
+    "merge",
+    "secrets_change"
+  ],
+  "tasks": [
+    {
+      "id": "IAP-001",
+      "title": "Read-only safety baseline",
+      "status": "DONE",
+      "branch": "agent/iap-001-orchestrator-bootstrap",
+      "mode": "orchestrator_bootstrap",
+      "priority": "high",
+      "allowed_files": [
+        "CLAUDE.md",
+        "docs/AGENT_REVIEW_RULES.md",
+        "docs/AGENT_RUN_REPORT.md",
+        "docs/AGENT_TASK_QUEUE.md",
+        "docs/POTUCKY_ORCHESTRATOR.md",
+        "docs/PROJECT_STATUS.md",
+        "docs/SECURITY_RULES.md",
+        "scripts/potucky_agent_prompts/",
+        "scripts/potucky_agent_tasks.json",
+        "scripts/potucky_orchestrator.py"
+      ],
+      "forbidden_actions": [
+        "publish",
+        "deploy",
+        "supabase_write",
+        "migration_apply",
+        "secret_print",
+        "env_print",
+        "github_actions_run",
+        "commit",
+        "push",
+        "merge"
+      ],
+      "validation_commands": [
+        "pwd",
+        "git status --short",
+        "git branch --show-current",
+        "git ls-files .github/workflows || true",
+        "find docs -maxdepth 2 -type f | sort || true"
+      ],
+      "done_requires": [
+        "executor_report",
+        "codex_review_pass",
+        "manual_approval_for_final_status"
+      ],
+      "notes": "Bootstrap task for POTUCKY ORCHESTRATOR safety baseline. Scope was expanded because the real bootstrap created docs and orchestrator scripts."
+    }
+  ]
+}

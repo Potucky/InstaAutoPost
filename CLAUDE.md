@@ -121,3 +121,18 @@ For code or doc changes, final responses should include:
 - Verification performed.
 - Remaining blockers, especially anything required before real Instagram publishing.
 
+## POTUCKY ORCHESTRATOR
+
+For automated local task coordination, use POTUCKY ORCHESTRATOR via `scripts/potucky_orchestrator.py` and follow `docs/POTUCKY_ORCHESTRATOR.md`.
+
+## Agent Workflow Rules
+
+- For multi-step work, follow `docs/AGENT_TASK_QUEUE.md`.
+- Work only on the first TODO task in the queue.
+- Do not start the next task until the current task is DONE or BLOCKED.
+- Use Codex as the read-only reviewer (see `docs/AGENT_REVIEW_RULES.md`).
+- Mark a task DONE only after all validation commands pass and Codex returns PASS.
+- Never publish, deploy, run migrations, expose secrets, or enable cron without explicit user approval.
+- File run reports in `docs/AGENT_RUN_REPORT.md` before requesting Codex review.
+- See `docs/SECURITY_RULES.md` for security rules that apply at all times.
+- See `docs/PROJECT_STATUS.md` for current project state snapshot.
