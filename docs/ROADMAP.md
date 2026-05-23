@@ -17,8 +17,13 @@ Partially implemented:
 - Content library and publishing queue UI.
 - Calendar and dashboard views.
 - Attempt log visibility.
-- Development RLS policies.
 - Worker retry handling.
+
+Implemented (Task 4.1 + 4.2):
+
+- Public signup disabled in UI by default.
+- Admin-only RLS posture: `public.instaautopost_admins` allowlist table, `public.is_instaautopost_admin()` helper, admin-only policies on all four core tables and on storage write operations (migration `20260523001000_harden_admin_only_rls.sql`).
+- First admin UUID must be inserted manually via SQL before the UI is usable in production (see `docs/SUPABASE_SCHEMA.md` — Admin Allowlist).
 
 Blocked:
 

@@ -13,10 +13,50 @@ Repo drift resolved (migration 20260516002000):
 
 Migration 20260516002000 exists in repo and has been applied during dev/local verification. Confirm it is applied to the production Supabase instance before live publishing. Treat unconfirmed production state as a blocker before live publishing.
 
+## Admin Allowlist
+
+Migration `20260523001000_harden_admin_only_rls.sql` replaces development-wide authenticated RLS policies with admin-only policies backed by an allowlist table.
+
+### `public.instaautopost_admins`
+
+| Field | Purpose |
+| --- | --- |
+| `user_id` | Primary key; FK to `auth.users(id)` ON DELETE CASCADE. |
+| `created_at` | Row creation timestamp. |
+
+RLS is enabled. A SELECT policy allows admins to read the allowlist. No browser INSERT/UPDATE/DELETE policies exist — admin rows must be inserted manually via SQL.
+
+### `public.is_instaautopost_admin()`
+
+Helper function (SQL, STABLE, SECURITY DEFINER, search_path = public). Returns `true` when `auth.uid()` exists in `public.instaautopost_admins`. Used as the `USING`/`WITH CHECK` expression in all admin-only RLS policies. SECURITY DEFINER prevents RLS on the admins table from blocking the lookup.
+
+### Adding the first admin UUID
+
+Run this SQL in the Supabase dashboard SQL editor or psql (replace the placeholder with the real UUID from Authentication > Users):
+
+```sql
+INSERT INTO public.instaautopost_admins (user_id) VALUES ('YOUR_AUTH_USER_UUID');
+```
+
+Do not commit a real UUID to this file or to any migration.
+
+### Access posture after migration 20260523001000
+
+| Actor | Access |
+| --- | --- |
+| Browser (admin in allowlist) | Full access per table policies below. |
+| Browser (authenticated, not in allowlist) | Blocked by all RLS policies. |
+| Browser (unauthenticated) | Blocked. |
+| Service role (worker / GitHub Actions) | Bypasses RLS entirely — unaffected. |
+| `claim_next_queue_item()` RPC | SECURITY DEFINER — bypasses RLS — unaffected. |
+
+Public signup remains disabled in the UI (Task 4.1). The allowlist check is the production safety net regardless of how a session was obtained.
+
 ## Current Tables
 
 Implemented in repo migrations:
 
+- `public.instaautopost_admins`
 - `public.ig_content_library`
 - `public.ig_publishing_queue`
 - `public.ig_publish_attempts`
@@ -28,8 +68,9 @@ Also implemented:
 - `public.queue_status` enum.
 - `public.attempt_status` enum.
 - `public.claim_next_queue_item(p_worker_id TEXT)` RPC.
-- RLS enabled on all three tables.
-- Development RLS policies for authenticated users.
+- `public.is_instaautopost_admin()` helper function.
+- RLS enabled on all tables.
+- Admin-only RLS policies (migration 20260523001000 replaces development-wide policies).
 
 ## `public.ig_content_library`
 
@@ -184,7 +225,7 @@ Migration `20260523000000_create_ig_schedule_slots.sql` adds:
 
 **Constraints**: `UNIQUE (scheduled_at)`; partial unique index on `content_id WHERE content_id IS NOT NULL`.
 
-**RLS**: enabled; development policies allow authenticated users to select, insert, and update.
+**RLS**: enabled; admin-only policies (migration `20260523001000_harden_admin_only_rls.sql`) restrict browser select, insert, and update to users in `public.instaautopost_admins`. No delete policy — use `slot_status = 'cancelled'` instead of hard-deleting slots.
 
 ## Storage Bucket
 
@@ -198,7 +239,7 @@ Migration `20260522000000_create_media_storage_bucket.sql` adds:
 
 **Why public**: Instagram's Graph API must fetch the video from `video_url` at publish time. Signed URLs from a private bucket expire before a scheduled publish and cannot be stored durably. Public bucket with non-guessable paths (UUID + timestamp) is the correct trade-off for content intended to be publicly posted anyway.
 
-**Upload policy**: Only authenticated users may upload/update/delete objects, scoped to their own UUID prefix via `(storage.foldername(name))[1] = auth.uid()::text`.
+**Upload/update/delete policy**: Only admin users (in `public.instaautopost_admins`) may upload, update, or delete objects. Hardened from any-authenticated in migration `20260523001000_harden_admin_only_rls.sql`.
 
 **Manual Supabase step required**: Apply this migration in the Supabase dashboard SQL editor, or if bucket creation via SQL INSERT is blocked by the managed environment, create the bucket manually (Storage > New Bucket > Name: `instaautopost-media` > Public: ON) and then apply only the policy statements.
 
@@ -224,3 +265,7 @@ Before first real publish:
 - [ ] Confirm service role can execute the claim RPC.
 - [ ] Confirm anon/authenticated users cannot execute worker-only RPCs.
 - [ ] Confirm RLS policies match current environment.
+- [ ] Confirm migration `20260523001000_harden_admin_only_rls.sql` is applied.
+- [ ] Confirm `public.instaautopost_admins` has at least one admin UUID inserted.
+- [ ] Confirm `public.is_instaautopost_admin()` returns `true` for the admin browser session.
+- [ ] Confirm service role worker still reads/writes queue and attempts without RLS errors.
