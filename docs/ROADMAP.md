@@ -25,6 +25,13 @@ Implemented (Task 4.1 + 4.2):
 - Admin-only RLS posture: `public.instaautopost_admins` allowlist table, `public.is_instaautopost_admin()` helper, admin-only policies on all four core tables and on storage write operations (migration `20260523001000_harden_admin_only_rls.sql`).
 - First admin UUID must be inserted manually via SQL before the UI is usable in production (see `docs/SUPABASE_SCHEMA.md` — Admin Allowlist).
 
+Implemented (Task 8):
+
+- Publisher workflow concurrency: `group: instaautopost-publisher`, `cancel-in-progress: false`. Overlapping runs are prevented; one pending run may wait.
+- Live mode requires explicit `live_confirmation` input equal to `PUBLISH LIVE`. No fallback to `vars.INSTAGRAM_API_ENABLED` — dry-run is unconditionally the default when `live_mode` is false.
+- Script live guard: worker checks `INSTAAUTOPOST_LIVE_CONFIRMATION == 'PUBLISH LIVE'` before any Supabase claim. Missing or wrong value → log error and exit 1.
+- Workflow split into two jobs: `publish_dry_run` (no environment, runs when `live_mode != true`) and `publish_live` (`environment: instagram-live`, runs when `live_mode == true`). Dry-run bypasses the environment gate entirely. The `instagram-live` environment must be created in Settings > Environments with at least one required reviewer before live publishing begins.
+
 Blocked:
 
 - First real Instagram publish.
@@ -46,7 +53,10 @@ Remaining before first real publish:
 - Confirm migration 20260516002000 is applied to production Supabase (applied in dev/local verification).
 - Run a dry-run against a known safe queue row and verify the attempt log.
 - Confirm `claim_next_queue_item` executes cleanly under the service role.
-- Get explicit user confirmation for the live publish.
+- Create GitHub Environment `instagram-live` in Settings > Environments with at least one required reviewer.
+- Confirm dry-run completes without triggering the `instagram-live` environment gate.
+- Confirm live confirmation guard rejects a run that omits or misspells the phrase.
+- Get explicit user confirmation for the live publish (pass `live_confirmation=PUBLISH LIVE` via workflow_dispatch).
 
 Known edge case (not blocking dry-run):
 
@@ -96,7 +106,6 @@ Known edge case (not blocking dry-run):
 ## Post-MVP Milestones
 
 - Re-enable scheduled publishing with a deliberate cron.
-- Add workflow concurrency controls if needed.
 - Add account connection status screen.
 - Add safety center screen.
 - Add media upload to Supabase Storage.

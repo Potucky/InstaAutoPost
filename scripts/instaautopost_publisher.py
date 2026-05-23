@@ -647,6 +647,14 @@ def main() -> None:
     # Validate live-only env vars BEFORE claiming a queue row.
     # A misconfigured worker must exit here, not after locking a row.
     if not DRY_RUN:
+        live_confirmation = os.environ.get("INSTAAUTOPOST_LIVE_CONFIRMATION", "").strip()
+        if live_confirmation != "PUBLISH LIVE":
+            log.error(
+                "Live mode requires INSTAAUTOPOST_LIVE_CONFIRMATION='PUBLISH LIVE' "
+                "— exiting without claiming a queue row"
+            )
+            sys.exit(1)
+
         ig_user_id = os.environ.get("IG_USER_ID", "").strip()
         access_token = os.environ.get("IG_ACCESS_TOKEN", "").strip()
         if not ig_user_id or not access_token:

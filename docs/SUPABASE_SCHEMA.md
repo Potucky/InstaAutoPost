@@ -343,3 +343,7 @@ Before first real publish:
 - [ ] Confirm `uidx_ig_schedule_slots_queue_id` exists on `ig_schedule_slots`.
 - [ ] Confirm `trg_sync_slot_with_queue_lifecycle` trigger exists on `ig_publishing_queue`.
 - [ ] Confirm `derive_slot_status_from_queue()` and `sync_slot_with_queue_lifecycle()` functions exist.
+- [ ] Confirm publisher workflow concurrency is configured (`group: instaautopost-publisher`, `cancel-in-progress: false`) in `.github/workflows/instaautopost-publisher.yml`.
+- [ ] Create GitHub Environment `instagram-live` in Settings > Environments with at least one required reviewer. Live workflow runs reference this environment; dry-run jobs bypass it.
+- [ ] Confirm dry-run (`live_mode=false`) completes without triggering the `instagram-live` environment gate.
+- [ ] Confirm live confirmation guard: a run with `live_mode=true` but missing or wrong `live_confirmation` exits 1 before claiming any queue row.
