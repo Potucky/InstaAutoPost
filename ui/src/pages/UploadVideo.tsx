@@ -1,8 +1,10 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Video, CheckCircle } from 'lucide-react'
+import { Video, CheckCircle, Upload, Loader2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+
+const STORAGE_BUCKET = 'instaautopost-media'
 
 interface FormData {
   title: string
@@ -24,6 +26,10 @@ const DEFAULTS: FormData = {
   media_type: 'video',
 }
 
+function sanitizeFilename(name: string): string {
+  return name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_')
+}
+
 export default function UploadVideo() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -31,6 +37,12 @@ export default function UploadVideo() {
   const [submitting, setSubmitting] = useState(false)
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const [uploadedPath, setUploadedPath] = useState<string | null>(null)
 
   function set(field: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -41,6 +53,48 @@ export default function UploadVideo() {
       .split(/[\s,]+/)
       .map((h) => (h.startsWith('#') ? h : `#${h}`))
       .filter((h) => h.length > 1)
+  }
+
+  async function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setSelectedFile(file)
+    setUploadError(null)
+    setUploadedPath(null)
+    set('video_url', '')
+    setUploading(true)
+
+    const userId = user?.id ?? 'anonymous'
+    const timestamp = Date.now()
+    const safeName = sanitizeFilename(file.name)
+    const storagePath = `${userId}/${timestamp}_${safeName}`
+
+    const { error: uploadErr } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(storagePath, file, { upsert: false })
+
+    if (uploadErr) {
+      setUploadError(`Upload failed: ${uploadErr.message}`)
+      setUploading(false)
+      return
+    }
+
+    const { data: urlData } = supabase.storage
+      .from(STORAGE_BUCKET)
+      .getPublicUrl(storagePath)
+
+    setUploadedPath(storagePath)
+    set('video_url', urlData.publicUrl)
+    setUploading(false)
+  }
+
+  function clearUpload() {
+    setSelectedFile(null)
+    setUploadedPath(null)
+    setUploadError(null)
+    set('video_url', '')
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -59,6 +113,7 @@ export default function UploadVideo() {
       thumbnail_url: form.thumbnail_url.trim() || null,
       hashtags: form.hashtag_input.trim() ? parseHashtags(form.hashtag_input) : null,
       duration_seconds: form.duration_seconds ? parseInt(form.duration_seconds, 10) : null,
+      file_size: selectedFile ? selectedFile.size : null,
       media_type: form.media_type,
       content_status: 'draft',
       created_by: user?.id ?? null,
@@ -124,18 +179,88 @@ export default function UploadVideo() {
               />
             </div>
 
+            {/* File Upload */}
             <div>
-              <label className="label" htmlFor="video_url">Video URL <span className="text-red-500">*</span></label>
+              <label className="label" htmlFor="video_file">Choose Video File</label>
+              <input
+                ref={fileInputRef}
+                id="video_file"
+                type="file"
+                accept="video/*"
+                className="hidden"
+                onChange={handleFileSelect}
+                disabled={uploading}
+              />
+
+              {!selectedFile ? (
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
+                  className="w-full flex items-center justify-center gap-2 rounded-lg border-2 border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500 hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Upload size={16} />
+                  Click to choose a video file
+                </button>
+              ) : (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                  {uploading ? (
+                    <div className="flex items-center gap-2 text-sm text-violet-700">
+                      <Loader2 size={15} className="animate-spin shrink-0" />
+                      <span className="truncate">Uploading {selectedFile.name}…</span>
+                    </div>
+                  ) : uploadedPath ? (
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-sm text-emerald-700 min-w-0">
+                        <CheckCircle size={15} className="shrink-0" />
+                        <span className="truncate">{selectedFile.name}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={clearUpload}
+                        className="shrink-0 text-slate-400 hover:text-slate-600"
+                        title="Remove uploaded file"
+                      >
+                        <X size={15} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 text-sm text-slate-600">
+                      <span className="truncate">{selectedFile.name}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {uploadError && (
+                <p className="text-xs text-red-600 mt-1">{uploadError}</p>
+              )}
+              <p className="text-xs text-slate-400 mt-1">
+                Uploads to Supabase Storage. Video URL is filled automatically after upload.
+              </p>
+            </div>
+
+            <div>
+              <label className="label" htmlFor="video_url">
+                Video URL <span className="text-red-500">*</span>
+                {uploadedPath && (
+                  <span className="ml-2 text-xs font-normal text-emerald-600">(auto-filled from upload)</span>
+                )}
+              </label>
               <input
                 id="video_url"
                 className="input"
                 type="url"
-                placeholder="https://..."
+                placeholder="https://…"
                 value={form.video_url}
                 onChange={(e) => set('video_url', e.target.value)}
                 required
               />
-              <p className="text-xs text-slate-400 mt-1">Publicly accessible URL. Instagram must be able to fetch it.</p>
+              <p className="text-xs text-slate-400 mt-1">
+                {uploadedPath
+                  ? 'Auto-filled from your upload. You can still edit this manually.'
+                  : 'Or paste a publicly accessible URL directly. Instagram must be able to fetch it.'}
+              </p>
             </div>
 
             <div>
@@ -194,7 +319,7 @@ export default function UploadVideo() {
             )}
 
             <div className="flex gap-3 pt-2">
-              <button type="submit" className="btn-primary" disabled={submitting}>
+              <button type="submit" className="btn-primary" disabled={submitting || uploading}>
                 {submitting ? 'Saving...' : 'Save to Library'}
               </button>
               <button

@@ -1,0 +1,68 @@
+name: Deploy InstaAutoPost UI to GitHub Pages
+
+# Triggers: manual dispatch, or any push to main that touches ui/.
+# The push trigger fires only when you push — it is not a scheduled deploy.
+# Do not merge or push to main until local verification is complete.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'ui/**'
+  workflow_dispatch:
+
+# Minimum permissions required for Pages artifact deployment.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Prevent overlapping deployments. New runs wait; they do not cancel in-flight ones.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build UI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ui
+        run: npm ci
+
+      # VITE_ vars are baked into the static bundle at build time.
+      # VITE_SUPABASE_ANON_KEY is the public-facing anon key (protected by RLS).
+      # The service role key is never used here.
+      - name: Build
+        working-directory: ui
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ui/dist
+
+  deploy:
+    name: Deploy to GitHub Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

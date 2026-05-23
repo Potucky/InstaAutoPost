@@ -76,7 +76,28 @@ Blocked before real Instagram publishing:
 - Dry-run not yet confirmed on an intended queue row.
 - User has not confirmed a live publishing run.
 
-## Running The UI
+## GitHub Pages (Control Center)
+
+The UI is deployable to GitHub Pages as a permanent bookmarkable control panel.
+
+**Public URL:** `https://potucky.github.io/InstaAutoPost/`
+
+**One-time repo setup (do this once before the first deploy):**
+
+1. Go to **GitHub → Settings → Pages**.
+2. Under **Source**, select **GitHub Actions** (not a branch).
+3. Add two Repository Secrets under **Settings → Secrets and variables → Actions**:
+   - `VITE_SUPABASE_URL` — your Supabase project URL
+   - `VITE_SUPABASE_ANON_KEY` — your Supabase anon key (public-facing; safe for browser)
+   - **Do not add** `SUPABASE_SERVICE_ROLE_KEY` here — that is backend-only.
+
+**Deploy:** push to `main` with any `ui/` change, or trigger manually via **Actions → Deploy InstaAutoPost UI to GitHub Pages → Run workflow**.
+
+**Workflow:** `.github/workflows/deploy-instaautopost-ui.yml` — builds UI only. No Instagram publishing. No service role key.
+
+**Deep-link / bookmark behaviour:** A `ui/public/404.html` redirect ensures bookmarked sub-routes (e.g. `/queue`, `/calendar`) survive a page refresh on GitHub Pages.
+
+## Running The UI Locally
 
 ```bash
 cd ui

@@ -160,6 +160,22 @@ Do not cancel or retry a row that already has completion proof.
 - Do not rely on old project table names.
 - Do not add generic JSON blobs for core state when typed queue columns exist.
 
+## Storage Bucket
+
+Migration `20260522000000_create_media_storage_bucket.sql` adds:
+
+| Item | Value |
+| --- | --- |
+| Bucket name | `instaautopost-media` |
+| Visibility | **Public** |
+| Object path pattern | `{user_uuid}/{timestamp}_{sanitized_filename}` |
+
+**Why public**: Instagram's Graph API must fetch the video from `video_url` at publish time. Signed URLs from a private bucket expire before a scheduled publish and cannot be stored durably. Public bucket with non-guessable paths (UUID + timestamp) is the correct trade-off for content intended to be publicly posted anyway.
+
+**Upload policy**: Only authenticated users may upload/update/delete objects, scoped to their own UUID prefix via `(storage.foldername(name))[1] = auth.uid()::text`.
+
+**Manual Supabase step required**: Apply this migration in the Supabase dashboard SQL editor, or if bucket creation via SQL INSERT is blocked by the managed environment, create the bucket manually (Storage > New Bucket > Name: `instaautopost-media` > Public: ON) and then apply only the policy statements.
+
 ## Migration Safety Rules
 
 - Never edit an already-applied production migration to hide drift.
@@ -182,4 +198,3 @@ Before first real publish:
 - [ ] Confirm service role can execute the claim RPC.
 - [ ] Confirm anon/authenticated users cannot execute worker-only RPCs.
 - [ ] Confirm RLS policies match current environment.
-
