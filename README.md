@@ -44,8 +44,19 @@ InstaAutoPost/
     ROADMAP.md
     SUPABASE_SCHEMA.md
   scripts/
-    instaautopost_publisher.py
+    instaautopost_publisher.py   ← production worker (GitHub Actions calls only this)
     requirements.txt
+    README.md                    ← script safety matrix
+    admin/
+      generate_schedule_slots.py
+      assign_content_to_schedule_slots.py
+      schedule_draft_content.py
+    local/
+      analyze_raw_media.py
+      prepare_test_video_batch.py
+      prepare_test_carousels.py
+      import_travel_test_batch.py
+      fix_video_post_002.py
   supabase/
     migrations/
     policies/
@@ -54,6 +65,16 @@ InstaAutoPost/
       instaautopost-publisher.yml
   ui/
 ```
+
+## Script Safety
+
+| Folder | Purpose | GitHub Actions? | Mutates Supabase? |
+| --- | --- | --- | --- |
+| `scripts/` (root) | Production worker | Yes — called by publisher workflow | Yes (queue/attempts via service role) |
+| `scripts/admin/` | Manual operator DB utilities | No | Yes, with `--execute` (scheduling/queue tables) |
+| `scripts/local/` | Local/test/diagnostic utilities | No | Only `import_travel_test_batch.py` and `fix_video_post_002.py` with `--execute` |
+
+The GitHub Actions workflow must call only `scripts/instaautopost_publisher.py`. Admin and local scripts must never appear in the workflow. See `scripts/README.md` for the full safety matrix.
 
 ## Current Status
 

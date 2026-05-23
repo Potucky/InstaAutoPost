@@ -28,6 +28,9 @@ concurrency:
   group: instaautopost-publisher
   cancel-in-progress: false
 
+# IMPORTANT: this workflow must call only scripts/instaautopost_publisher.py.
+# scripts/admin/ and scripts/local/ are operator/developer utilities and must
+# never appear in this workflow.
 jobs:
   publish_dry_run:
     name: InstaAutoPost Publisher Worker (dry-run)

@@ -17,8 +17,8 @@ Carousel schema note:
   not linked in the DB. Full carousel publishing requires a future schema extension.
 
 Usage:
-    python3 scripts/import_travel_test_batch.py             # dry run
-    python3 scripts/import_travel_test_batch.py --execute   # real upload + insert
+    python3 scripts/local/import_travel_test_batch.py             # dry run
+    python3 scripts/local/import_travel_test_batch.py --execute   # real upload + insert
 
 Required env vars:
     SUPABASE_URL

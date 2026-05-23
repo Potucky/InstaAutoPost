@@ -16,7 +16,7 @@ carousel draws photos from different parts of the source library rather
 than one consecutive block. No source is reused across carousels.
 
 Usage:
-    python3 scripts/prepare_test_carousels.py
+    python3 scripts/local/prepare_test_carousels.py
 
 Outputs (created inside ~/Desktop/InstaAutoPost_Travel_Content/ready_carousels/):
     carousel-001/01.jpg … 07.jpg

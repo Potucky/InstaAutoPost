@@ -7,7 +7,7 @@ candidate type, and writes CSV manifests plus a plain-text summary to a reports
 folder.  No files are modified, moved, deleted, converted, uploaded, or published.
 
 Usage:
-    python3 scripts/analyze_raw_media.py
+    python3 scripts/local/analyze_raw_media.py
 
 Outputs (created inside ~/Desktop/InstaAutoPost_Travel_Content/reports/):
     raw_video_manifest.csv

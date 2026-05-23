@@ -347,3 +347,20 @@ Before first real publish:
 - [ ] Create GitHub Environment `instagram-live` in Settings > Environments with at least one required reviewer. Live workflow runs reference this environment; dry-run jobs bypass it.
 - [ ] Confirm dry-run (`live_mode=false`) completes without triggering the `instagram-live` environment gate.
 - [ ] Confirm live confirmation guard: a run with `live_mode=true` but missing or wrong `live_confirmation` exits 1 before claiming any queue row.
+
+## Manual Script Safety Note
+
+Scripts in `scripts/admin/` can mutate scheduling and queue tables when `--execute` is passed:
+
+- `generate_schedule_slots.py` — inserts rows into `ig_schedule_slots`.
+- `assign_content_to_schedule_slots.py` — updates `content_id` and `slot_status` on `ig_schedule_slots`.
+- `schedule_draft_content.py` — inserts rows into `ig_publishing_queue`.
+
+All three are dry-run by default. Verify `SUPABASE_URL` points to the intended Supabase project before using `--execute`.
+
+Scripts in `scripts/local/` that can mutate Supabase:
+
+- `import_travel_test_batch.py` — uploads files to Supabase Storage and inserts rows into `ig_content_library` with `--execute`. Must not target production unless a test import is explicitly intended.
+- `fix_video_post_002.py` — uploads one file to Supabase Storage and inserts one row into `ig_content_library` with `--execute`. Must not target production unless explicitly intended.
+
+No script in `scripts/admin/` or `scripts/local/` publishes to Instagram or triggers GitHub Actions. The GitHub Actions publisher workflow calls only `scripts/instaautopost_publisher.py`.

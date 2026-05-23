@@ -9,7 +9,7 @@ Dry-run by default. Use --execute to insert rows into Supabase.
 Does NOT publish to Instagram, trigger GitHub Actions, or touch Storage.
 
 Usage example:
-  python3 scripts/schedule_draft_content.py \
+  python3 scripts/admin/schedule_draft_content.py \
     --first-in-minutes 5 \
     --end-date 2026-07-01 \
     --windows "07:00:00-09:00:00,12:00:00-14:00:00,18:00:00-20:00:00" \

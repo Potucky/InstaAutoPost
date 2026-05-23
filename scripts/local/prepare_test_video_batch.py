@@ -10,7 +10,7 @@ Original files are never modified, moved, or deleted.
 No network calls. No Supabase. No Instagram actions.
 
 Usage:
-    python3 scripts/prepare_test_video_batch.py
+    python3 scripts/local/prepare_test_video_batch.py
 
 Outputs (created inside ~/Desktop/InstaAutoPost_Travel_Content/):
     ready_reels/reel-001.mp4

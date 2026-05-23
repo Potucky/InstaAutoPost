@@ -14,8 +14,8 @@ Safety:
   - Default: DRY RUN. Pass --execute to write.
 
 Usage:
-    python3 scripts/fix_video_post_002.py            # dry run
-    python3 scripts/fix_video_post_002.py --execute  # real upload + insert
+    python3 scripts/local/fix_video_post_002.py            # dry run
+    python3 scripts/local/fix_video_post_002.py --execute  # real upload + insert
 
 Required env vars (--execute only):
     SUPABASE_URL
@@ -151,7 +151,7 @@ def _build_client():
         print(
             "\n[error] Missing required env vars. Run with:\n\n"
             "  SUPABASE_URL='...' SUPABASE_SERVICE_ROLE_KEY='...' "
-            "python3 scripts/fix_video_post_002.py --execute\n",
+            "python3 scripts/local/fix_video_post_002.py --execute\n",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -182,7 +182,7 @@ def main() -> None:
         print(
             "\n[error] Missing required env vars. Run with:\n\n"
             "  SUPABASE_URL='...' SUPABASE_SERVICE_ROLE_KEY='...' "
-            "python3 scripts/fix_video_post_002.py --execute\n",
+            "python3 scripts/local/fix_video_post_002.py --execute\n",
             file=sys.stderr,
         )
         sys.exit(1)

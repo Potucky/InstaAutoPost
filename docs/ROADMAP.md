@@ -32,6 +32,12 @@ Implemented (Task 8):
 - Script live guard: worker checks `INSTAAUTOPOST_LIVE_CONFIRMATION == 'PUBLISH LIVE'` before any Supabase claim. Missing or wrong value → log error and exit 1.
 - Workflow split into two jobs: `publish_dry_run` (no environment, runs when `live_mode != true`) and `publish_live` (`environment: instagram-live`, runs when `live_mode == true`). Dry-run bypasses the environment gate entirely. The `instagram-live` environment must be created in Settings > Environments with at least one required reviewer before live publishing begins.
 
+Implemented (Task 9):
+
+- Script separation: production worker stays at `scripts/instaautopost_publisher.py`; manual/admin DB utilities moved to `scripts/admin/`; local/test/diagnostic utilities moved to `scripts/local/`.
+- `scripts/README.md` added with a safety matrix covering who calls each script, whether it can mutate Supabase, and the rule that the GitHub Actions workflow must call only `scripts/instaautopost_publisher.py`.
+- Production automation must not invoke scripts in `scripts/admin/` or `scripts/local/`.
+
 Blocked:
 
 - First real Instagram publish.
