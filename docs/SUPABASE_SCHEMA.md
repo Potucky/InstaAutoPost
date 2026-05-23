@@ -247,8 +247,8 @@ Migration `20260523000000_create_ig_schedule_slots.sql` adds:
 | `slot_date` | Calendar date of the slot. |
 | `slot_window` | `morning`, `lunch`, or `evening`. |
 | `scheduled_at` | Exact UTC timestamptz for this slot (unique). |
-| `content_id` | FK to `ig_content_library`; null when empty. Unique where not null. |
-| `queue_id` | FK to `ig_publishing_queue`; null until queued. |
+| `content_id` | FK to `ig_content_library`; null when empty. Unique across active statuses (assigned, queued). |
+| `queue_id` | FK to `ig_publishing_queue`; null until linked. Unique where not null. |
 | `slot_status` | `empty`, `assigned`, `queued`, `published`, `failed`, or `cancelled`. |
 | `notes` | Optional free-text note. |
 | `created_at` | Creation timestamp. |
@@ -258,9 +258,38 @@ Migration `20260523000000_create_ig_schedule_slots.sql` adds:
 
 **Indexes**: `slot_date`, `scheduled_at`, `slot_status`, `content_id`, `queue_id`.
 
-**Constraints**: `UNIQUE (scheduled_at)`; partial unique index on `content_id WHERE content_id IS NOT NULL`.
+**Constraints** (after migration `20260523003000_sync_schedule_slots_with_queue_lifecycle.sql`):
+
+| Constraint | Definition | Purpose |
+| --- | --- | --- |
+| `ig_schedule_slots_scheduled_at_unique` | `UNIQUE (scheduled_at)` | One slot per exact publish moment. |
+| `uidx_ig_schedule_slots_active_content_id` | Partial unique on `content_id WHERE content_id IS NOT NULL AND slot_status IN ('assigned','queued')` | At most one active slot per content item. Terminal slots (published, failed, cancelled) do not block re-scheduling. Replaces the former global `ig_schedule_slots_content_id_unique` index. |
+| `uidx_ig_schedule_slots_queue_id` | Partial unique on `queue_id WHERE queue_id IS NOT NULL` | Each queue row is linked to at most one slot. |
 
 **RLS**: enabled; admin-only policies (migration `20260523001000_harden_admin_only_rls.sql`) restrict browser select, insert, and update to users in `public.instaautopost_admins`. No delete policy — use `slot_status = 'cancelled'` instead of hard-deleting slots.
+
+**Queue linkage and lifecycle sync (migration `20260523003000_sync_schedule_slots_with_queue_lifecycle.sql`)**:
+
+`ig_publishing_queue` is the lifecycle source of truth. `ig_schedule_slots` is a calendar projection — it reflects queue state but does not drive it.
+
+*queue_id link contract*: a slot is linked by setting `slot.queue_id = queue.id`. Once linked, the trigger `trg_sync_slot_with_queue_lifecycle` (AFTER INSERT OR UPDATE on `ig_publishing_queue`) automatically updates the slot's `content_id`, `scheduled_at`, `slot_date`, `slot_status`, and `updated_at`. `slot_window` is never modified by the trigger — it is the user's scheduling choice.
+
+*Derived slot_status mapping*:
+
+| Queue state | Derived `slot_status` |
+| --- | --- |
+| `published_at IS NOT NULL` or `external_media_id IS NOT NULL` | `published` |
+| `queue_status = 'failed'` | `failed` |
+| `queue_status = 'cancelled'` | `cancelled` |
+| All other queue statuses | `queued` |
+
+*failed / cancelled are marked, not auto-released*: when a queue row reaches `failed` or `cancelled`, the linked slot is marked accordingly. The slot is NOT automatically released back to `assigned` or `empty`. An operator or future app task must explicitly re-assign content if a retry is desired.
+
+*Published proof stays on `ig_publishing_queue`*: `published_at` and `external_media_id` are set only on the queue row. `slot_status = 'published'` is a projection only — do not use slot status as publishing proof.
+
+*Re-queue semantics*: the `uidx_ig_schedule_slots_active_content_id` partial index covers only `assigned` and `queued` statuses. A content item whose previous slot reached a terminal status may be assigned to a new slot without violating the index.
+
+*Follow-up task*: creating a queue row from an assigned slot and linking them atomically (setting `slot.queue_id` and inserting the queue row in the same transaction) is an application-level operation for a later task.
 
 ## Storage Bucket
 
@@ -307,3 +336,8 @@ Before first real publish:
 - [ ] Confirm migration `20260523002000_prevent_duplicate_active_queue_rows.sql` is applied.
 - [ ] Confirm `uidx_ig_publishing_queue_active_content_id` index exists on `ig_publishing_queue`.
 - [ ] Run pre-apply duplicate check query; confirm zero rows before applying if data exists.
+- [ ] Confirm migration `20260523003000_sync_schedule_slots_with_queue_lifecycle.sql` is applied.
+- [ ] Confirm `uidx_ig_schedule_slots_active_content_id` exists; `ig_schedule_slots_content_id_unique` is dropped.
+- [ ] Confirm `uidx_ig_schedule_slots_queue_id` exists on `ig_schedule_slots`.
+- [ ] Confirm `trg_sync_slot_with_queue_lifecycle` trigger exists on `ig_publishing_queue`.
+- [ ] Confirm `derive_slot_status_from_queue()` and `sync_slot_with_queue_lifecycle()` functions exist.
