@@ -20,6 +20,7 @@ export default function ContentLibrary() {
   const [filter, setFilter] = useState<ContentStatus | 'all'>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [publishingNow, setPublishingNow] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
@@ -41,6 +42,99 @@ export default function ContentLibrary() {
   async function handleArchive(id: string) {
     await supabase.from('ig_content_library').update({ content_status: 'archived' }).eq('id', id)
     load()
+  }
+
+  async function handlePublishNow(item: ContentItem) {
+    if (publishingNow === item.id) return
+    setPublishingNow(item.id)
+    try {
+      // Duplicate guard: reject if an active (non-terminal) queue row already exists.
+      // Terminal statuses (published, cancelled, failed at max attempts) are not blocked
+      // so the user can re-queue after a prior run completes.
+      const { data: existing } = await supabase
+        .from('ig_publishing_queue')
+        .select('id, queue_status')
+        .eq('content_id', item.id)
+        .in('queue_status', ['ready', 'scheduled', 'processing', 'retry_scheduled'])
+        .is('published_at', null)
+        .is('external_media_id', null)
+        .limit(1)
+
+      if (existing && existing.length > 0) {
+        alert(
+          `Already queued: a "${existing[0].queue_status}" queue item exists for this video.\n` +
+          'Cancel it first or wait for it to complete before queuing again.'
+        )
+        return
+      }
+
+      // Create the queue row and get back the inserted ID
+      const { data: inserted, error: insertErr } = await supabase
+        .from('ig_publishing_queue')
+        .insert({
+          content_id: item.id,
+          queue_status: 'ready',
+          scheduled_at: new Date().toISOString(),
+          created_by: user?.id ?? null,
+        })
+        .select('id')
+        .single()
+
+      if (insertErr || !inserted) {
+        alert(`Error creating queue item: ${insertErr?.message ?? 'Unknown error'}`)
+        return
+      }
+
+      // Post-insert duplicate guard: catch the narrow race window (e.g. two tabs
+      // both passing the pre-insert check before either insert committed).
+      // If any OTHER active row for this content exists, cancel ours and abort.
+      const { data: raceRows } = await supabase
+        .from('ig_publishing_queue')
+        .select('id')
+        .eq('content_id', item.id)
+        .in('queue_status', ['ready', 'scheduled', 'processing', 'retry_scheduled'])
+        .is('published_at', null)
+        .is('external_media_id', null)
+        .neq('id', inserted.id)
+        .limit(1)
+
+      if (raceRows && raceRows.length > 0) {
+        await supabase
+          .from('ig_publishing_queue')
+          .update({ queue_status: 'cancelled' })
+          .eq('id', inserted.id)
+        alert(
+          'Another publish was triggered at the same time for this video.\n' +
+          'Check the Publishing Queue for the active item.'
+        )
+        load()
+        return
+      }
+
+      // Trigger the publish workflow via the Edge Function.
+      // The Edge Function holds the GitHub PAT — no secret is sent from the browser.
+      const { error: fnErr } = await supabase.functions.invoke('trigger-publish', {
+        body: { queue_id: inserted.id },
+      })
+
+      if (fnErr) {
+        // Queue row exists but the workflow trigger failed.
+        // The user can trigger manually from GitHub Actions using the queue_id.
+        alert(
+          'Queue item created but the publish workflow could not be triggered automatically.\n\n' +
+          'To publish manually:\n' +
+          'GitHub Actions → InstaAutoPost Publisher → Run workflow\n' +
+          `Set queue_id to: ${inserted.id}\n` +
+          'Set live_mode to: true'
+        )
+      } else {
+        alert('Publish workflow triggered! Check the Publishing Queue for live status.')
+      }
+
+      load()
+    } finally {
+      setPublishingNow(null)
+    }
   }
 
   async function handleAddToQueue(item: ContentItem) {
@@ -142,13 +236,23 @@ export default function ContentLibrary() {
                           </button>
                         )}
                         {item.content_status === 'approved' && (
-                          <button
-                            type="button"
-                            onClick={() => handleAddToQueue(item)}
-                            className="text-xs text-violet-600 hover:text-violet-700 font-medium"
-                          >
-                            + Queue
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => handlePublishNow(item)}
+                              disabled={publishingNow === item.id}
+                              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-40"
+                            >
+                              {publishingNow === item.id ? '…' : 'Publish Now'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleAddToQueue(item)}
+                              className="text-xs text-violet-600 hover:text-violet-700 font-medium"
+                            >
+                              + Queue
+                            </button>
+                          </>
                         )}
                         {item.content_status !== 'archived' && (
                           <button

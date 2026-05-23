@@ -7,6 +7,15 @@ on:
   #   # Every 5 minutes — processes one queue item per execution
   #   - cron: '*/5 * * * *'
   workflow_dispatch:
+    inputs:
+      queue_id:
+        description: 'Queue item ID to publish (leave empty to process next due item)'
+        required: false
+        default: ''
+      live_mode:
+        description: 'Enable live Instagram publishing for this run (true/false)'
+        required: false
+        default: 'false'
 
 jobs:
   publish:
@@ -34,9 +43,12 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          # Set to "true" in GitHub Variables to enable live publishing.
-          # Defaults to dry-run if not set.
-          INSTAGRAM_API_ENABLED: ${{ vars.INSTAGRAM_API_ENABLED }}
+          # live_mode input overrides the global variable for this run only.
+          # The global vars.INSTAGRAM_API_ENABLED remains unchanged after the run.
+          INSTAGRAM_API_ENABLED: ${{ github.event.inputs.live_mode || vars.INSTAGRAM_API_ENABLED }}
+          # When set, the worker processes only this queue item (one-click publish flow).
+          # Leave empty for the default "next due item" behaviour.
+          TARGET_QUEUE_ID: ${{ github.event.inputs.queue_id }}
         run: |
           echo "InstaAutoPost Publisher — starting"
           python scripts/instaautopost_publisher.py

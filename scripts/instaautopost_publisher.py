@@ -24,6 +24,10 @@ from supabase import create_client, Client
 WORKER_VERSION = "1.2.0"
 WORKER_ID = f"worker-{uuid.uuid4().hex[:8]}"
 DRY_RUN = os.environ.get("INSTAGRAM_API_ENABLED", "false").strip().lower() != "true"
+TARGET_QUEUE_ID = os.environ.get("TARGET_QUEUE_ID", "").strip() or None
+
+# Statuses that allow a worker to claim a row (mirrors claim_next_queue_item SQL).
+ELIGIBLE_STATUSES_FOR_CLAIM = ("ready", "scheduled", "retry_scheduled", "processing")
 
 IG_API_BASE = "https://graph.facebook.com/v19.0"
 CONTAINER_POLL_INTERVAL_S = 5
@@ -64,6 +68,104 @@ def claim_queue_item(supabase: Client) -> Optional[dict]:
     if result.data:
         return result.data[0]
     return None
+
+
+def fetch_and_lock_target_item(supabase: Client, target_id: str) -> Optional[dict]:
+    """Fetch and lock a specific queue item by ID for the one-click publish flow.
+
+    Used only when TARGET_QUEUE_ID is set. Unlike claim_next_queue_item, this
+    targets a known row rather than selecting the next due item. The conditional
+    UPDATE acts as optimistic concurrency control: if another process already
+    claimed the row between the fetch and the update, the .in_() / .is_() filters
+    will exclude it and data will be empty — this function returns None safely.
+    """
+    # Fetch current row state
+    fetch_result = (
+        supabase.table("ig_publishing_queue")
+        .select("*")
+        .eq("id", target_id)
+        .single()
+        .execute()
+    )
+    if not fetch_result.data:
+        log.warning(f"TARGET_QUEUE_ID={target_id} not found in ig_publishing_queue")
+        return None
+
+    row = fetch_result.data
+
+    # Pre-validate before touching the row
+    if row.get("published_at") or row.get("external_media_id"):
+        log.warning(f"TARGET_QUEUE_ID={target_id} is already published — skipping")
+        return None
+
+    if row.get("queue_status") not in ELIGIBLE_STATUSES_FOR_CLAIM:
+        log.warning(
+            f"TARGET_QUEUE_ID={target_id} ineligible: "
+            f"queue_status={row.get('queue_status')!r}"
+        )
+        return None
+
+    attempt_count = row.get("attempt_count", 0)
+    max_attempts = row.get("max_attempts", 3)
+    if attempt_count >= max_attempts:
+        log.warning(
+            f"TARGET_QUEUE_ID={target_id} at max attempts "
+            f"({attempt_count}/{max_attempts}) — will not reclaim"
+        )
+        return None
+
+    # Pre-check: if the row is actively processing under a fresh lock, abort early
+    # to prevent a second worker from racing with an in-flight publish.
+    locked_at_str = row.get("locked_at")
+    if row.get("queue_status") == "processing" and locked_at_str:
+        try:
+            locked_at_dt = datetime.fromisoformat(locked_at_str.replace("Z", "+00:00"))
+            if locked_at_dt >= datetime.now(timezone.utc) - timedelta(minutes=10):
+                log.warning(
+                    f"TARGET_QUEUE_ID={target_id} is actively processing "
+                    f"(locked_at={locked_at_str}) — aborting to prevent duplicate publish"
+                )
+                return None
+        except (ValueError, TypeError):
+            pass  # unparseable locked_at: let the conditional UPDATE decide
+
+    now_dt = datetime.now(timezone.utc)
+    now = now_dt.isoformat()
+    # Rows locked within the last 10 minutes are considered actively held.
+    # This matches the stale-lock window in claim_next_queue_item.
+    stale_threshold = (now_dt - timedelta(minutes=10)).isoformat()
+
+    # Conditional UPDATE — the full predicate set mirrors claim_next_queue_item's
+    # WHERE clause, including the stale-lock guard. Only one worker can win:
+    # the second concurrent update will find queue_status != eligible (already
+    # 'processing' with a fresh lock) and return no rows.
+    update_result = (
+        supabase.table("ig_publishing_queue")
+        .update({
+            "queue_status": "processing",
+            "locked_at": now,
+            "locked_by": WORKER_ID,
+            "attempt_count": attempt_count + 1,
+            "updated_at": now,
+        })
+        .eq("id", target_id)
+        .is_("published_at", None)
+        .is_("external_media_id", None)
+        .in_("queue_status", list(ELIGIBLE_STATUSES_FOR_CLAIM))
+        .lt("attempt_count", max_attempts)
+        .or_(f"locked_at.is.null,locked_at.lt.{stale_threshold}")
+        .select()
+        .execute()
+    )
+
+    if not update_result.data:
+        log.warning(
+            f"TARGET_QUEUE_ID={target_id} could not be locked — "
+            "row state changed between fetch and update (already claimed or published)"
+        )
+        return None
+
+    return update_result.data[0]
 
 
 def get_content(supabase: Client, content_id: str) -> dict:
@@ -535,7 +637,10 @@ def _process_live(
 # Entry point
 # ---------------------------------------------------------------------------
 def main() -> None:
-    log.info(f"InstaAutoPost Publisher Worker {WORKER_VERSION} | id={WORKER_ID} | dry_run={DRY_RUN}")
+    log.info(
+        f"InstaAutoPost Publisher Worker {WORKER_VERSION} | id={WORKER_ID} | "
+        f"dry_run={DRY_RUN} | target_queue_id={TARGET_QUEUE_ID}"
+    )
 
     supabase = get_supabase()
 
@@ -551,7 +656,11 @@ def main() -> None:
             )
             sys.exit(1)
 
-    item = claim_queue_item(supabase)
+    if TARGET_QUEUE_ID:
+        item = fetch_and_lock_target_item(supabase, TARGET_QUEUE_ID)
+    else:
+        item = claim_queue_item(supabase)
+
     if item is None:
         log.info("No due queue items — nothing to publish")
         return
