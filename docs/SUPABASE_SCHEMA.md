@@ -127,6 +127,26 @@ Required rule:
 
 - Queue failure state belongs in `failure_reason`.
 
+**Partial unique index (migration `20260523002000_prevent_duplicate_active_queue_rows.sql`)**:
+
+Index name: `uidx_ig_publishing_queue_active_content_id`
+
+Enforces at most one active queue row per `content_id`. Covers only active statuses: `scheduled`, `ready`, `processing`, `retry_scheduled`. Rows with terminal or draft statuses are not covered and do not block a future re-queue.
+
+Pre-apply duplicate check — run this before applying the migration if the database has pre-existing data:
+
+```sql
+SELECT content_id, COUNT(*) AS active_count
+FROM   public.ig_publishing_queue
+WHERE  queue_status IN ('scheduled', 'ready', 'processing', 'retry_scheduled')
+GROUP  BY content_id
+HAVING COUNT(*) > 1;
+```
+
+If this query returns rows, resolve the duplicates (cancel or update conflicting rows) before running the migration. The migration's DO block will raise an exception and abort if duplicates exist.
+
+Error code reference: Postgres raises `23505` (`unique_violation`) when an INSERT or UPDATE would create a second active row for the same `content_id`. UI and scripts should treat `23505` from `uidx_ig_publishing_queue_active_content_id` as "content is already queued". Handling this error code in the UI and worker is a follow-up task.
+
 ## `public.ig_publish_attempts`
 
 Based on current migration and worker code:
@@ -161,6 +181,21 @@ Based on current migration and worker code:
 - `failed`
 - `cancelled`
 - `retry_scheduled`
+
+**Active statuses** — covered by `uidx_ig_publishing_queue_active_content_id`; at most one row per `content_id` may hold any of these at once:
+
+- `scheduled`
+- `ready`
+- `processing`
+- `retry_scheduled`
+
+**Terminal statuses** — not covered by the unique index; a content item may be re-queued after reaching any of these:
+
+- `published`
+- `failed`
+- `cancelled`
+
+**`draft`** — not active; not covered by the unique index. A draft row does not block a second row from becoming active for the same content.
 
 `attempt_status` values:
 
@@ -269,3 +304,6 @@ Before first real publish:
 - [ ] Confirm `public.instaautopost_admins` has at least one admin UUID inserted.
 - [ ] Confirm `public.is_instaautopost_admin()` returns `true` for the admin browser session.
 - [ ] Confirm service role worker still reads/writes queue and attempts without RLS errors.
+- [ ] Confirm migration `20260523002000_prevent_duplicate_active_queue_rows.sql` is applied.
+- [ ] Confirm `uidx_ig_publishing_queue_active_content_id` index exists on `ig_publishing_queue`.
+- [ ] Run pre-apply duplicate check query; confirm zero rows before applying if data exists.
