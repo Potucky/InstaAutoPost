@@ -20,6 +20,7 @@ Implemented in repo migrations:
 - `public.ig_content_library`
 - `public.ig_publishing_queue`
 - `public.ig_publish_attempts`
+- `public.ig_schedule_slots`
 
 Also implemented:
 
@@ -159,6 +160,31 @@ Do not cancel or retry a row that already has completion proof.
 - Do not use `ig_publishing_queue.error_message`.
 - Do not rely on old project table names.
 - Do not add generic JSON blobs for core state when typed queue columns exist.
+
+## `public.ig_schedule_slots`
+
+Migration `20260523000000_create_ig_schedule_slots.sql` adds:
+
+| Field | Purpose |
+| --- | --- |
+| `id` | Primary key (gen_random_uuid). |
+| `slot_date` | Calendar date of the slot. |
+| `slot_window` | `morning`, `lunch`, or `evening`. |
+| `scheduled_at` | Exact UTC timestamptz for this slot (unique). |
+| `content_id` | FK to `ig_content_library`; null when empty. Unique where not null. |
+| `queue_id` | FK to `ig_publishing_queue`; null until queued. |
+| `slot_status` | `empty`, `assigned`, `queued`, `published`, `failed`, or `cancelled`. |
+| `notes` | Optional free-text note. |
+| `created_at` | Creation timestamp. |
+| `updated_at` | Auto-updated on any row change. |
+
+**Purpose**: user-facing calendar/schedule plan. `ig_publishing_queue` remains the worker queue. Slots start as `empty`; content and queue rows are assigned in a separate step.
+
+**Indexes**: `slot_date`, `scheduled_at`, `slot_status`, `content_id`, `queue_id`.
+
+**Constraints**: `UNIQUE (scheduled_at)`; partial unique index on `content_id WHERE content_id IS NOT NULL`.
+
+**RLS**: enabled; development policies allow authenticated users to select, insert, and update.
 
 ## Storage Bucket
 

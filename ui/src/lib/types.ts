@@ -49,6 +49,26 @@ export interface QueueItem {
   ig_content_library?: ContentItem;
 }
 
+export type SlotStatus = 'empty' | 'assigned' | 'queued' | 'published' | 'failed' | 'cancelled';
+
+export interface ScheduleSlot {
+  id: string;
+  slot_date: string;
+  slot_window: 'morning' | 'lunch' | 'evening';
+  scheduled_at: string;
+  content_id: string | null;
+  queue_id: string | null;
+  slot_status: SlotStatus;
+  notes: string | null;
+  created_at: string;
+  updated_at: string;
+  ig_content_library?: {
+    id: string;
+    title: string;
+    media_type: string;
+  } | null;
+}
+
 export interface PublishAttempt {
   id: string;
   queue_id: string;
