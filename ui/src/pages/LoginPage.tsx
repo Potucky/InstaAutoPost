@@ -4,6 +4,8 @@ import { Zap } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
+const enableSignup = import.meta.env.VITE_ENABLE_SIGNUP === 'true'
+
 export default function LoginPage() {
   const { session, loading } = useAuth()
   const [mode, setMode] = useState<'signin' | 'signup'>('signin')
@@ -25,7 +27,7 @@ export default function LoginPage() {
     if (mode === 'signin') {
       const { error: err } = await supabase.auth.signInWithPassword({ email, password })
       if (err) setError(err.message)
-    } else {
+    } else if (enableSignup) {
       const { error: err } = await supabase.auth.signUp({ email, password })
       if (err) setError(err.message)
       else setInfo('Check your email for a confirmation link, then sign in.')
@@ -55,7 +57,7 @@ export default function LoginPage() {
 
         <div className="bg-white rounded-2xl shadow-xl p-6">
           <h1 className="text-lg font-bold text-slate-900 mb-5">
-            {mode === 'signin' ? 'Sign in' : 'Create account'}
+            {enableSignup && mode === 'signup' ? 'Create account' : 'Sign in'}
           </h1>
 
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -99,21 +101,27 @@ export default function LoginPage() {
             )}
 
             <button type="submit" className="btn-primary w-full justify-center" disabled={submitting}>
-              {submitting ? 'Please wait...' : mode === 'signin' ? 'Sign in' : 'Create account'}
+              {submitting ? 'Please wait...' : enableSignup && mode === 'signup' ? 'Create account' : 'Sign in'}
             </button>
           </form>
 
-          <div className="mt-4 text-center">
-            <button
-              type="button"
-              onClick={switchMode}
-              className="text-sm text-violet-600 hover:text-violet-700"
-            >
-              {mode === 'signin'
-                ? "Don't have an account? Sign up"
-                : 'Already have an account? Sign in'}
-            </button>
-          </div>
+          {enableSignup ? (
+            <div className="mt-4 text-center">
+              <button
+                type="button"
+                onClick={switchMode}
+                className="text-sm text-violet-600 hover:text-violet-700"
+              >
+                {mode === 'signin'
+                  ? "Don't have an account? Sign up"
+                  : 'Already have an account? Sign in'}
+              </button>
+            </div>
+          ) : (
+            <p className="mt-4 text-center text-xs text-slate-400">
+              Sign up is disabled for this production control panel.
+            </p>
+          )}
         </div>
       </div>
     </div>
