@@ -137,7 +137,7 @@ def write_attempt(
         "container_id": container_id,
         "media_id": media_id,
         "error_message": error_message[:2000] if error_message else None,
-        "response_data": response_data,
+        "response_data": response_data if response_data is not None else {},
         "duration_ms": duration_ms,
         "dry_run": DRY_RUN,
         "worker_version": WORKER_VERSION,
@@ -239,10 +239,41 @@ def _redact_url(url: str) -> str:
     return url
 
 
+def _extract_ig_error_data(resp: "requests.Response") -> dict:
+    """Return safe, structured fields from an IG API error response.
+
+    Only includes fields that are safe to store: no URLs, tokens, or raw payloads.
+    """
+    safe: dict = {"status_code": resp.status_code, "reason": resp.reason}
+    try:
+        body = resp.json()
+        if isinstance(body, dict):
+            err = body.get("error", {})
+            if isinstance(err, dict):
+                for field in ("message", "code", "type", "error_subcode", "fbtrace_id"):
+                    if field in err:
+                        safe[field] = err[field]
+    except Exception:
+        pass
+    return safe
+
+
+class IGAPIError(RuntimeError):
+    """Instagram API error that carries structured, safe response data."""
+
+    def __init__(self, message: str, response_data: Optional[dict] = None) -> None:
+        super().__init__(message)
+        self.response_data: dict = response_data if response_data is not None else {}
+
+
 def _safe_raise(resp: "requests.Response", context: str = "IG API") -> None:
-    """Raise a RuntimeError with only the HTTP status — never the full request URL."""
+    """Raise IGAPIError with HTTP status and safe IG error fields — never the full request URL."""
     if not resp.ok:
-        raise RuntimeError(f"{context} error: HTTP {resp.status_code} {resp.reason}")
+        safe_data = _extract_ig_error_data(resp)
+        raise IGAPIError(
+            f"{context} error: HTTP {resp.status_code} {resp.reason}",
+            response_data=safe_data,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -266,7 +297,11 @@ def ig_create_container(
     _safe_raise(resp, "IG container creation")
     data = resp.json()
     if "error" in data:
-        raise RuntimeError(f"IG container creation error: HTTP {resp.status_code} code={data['error'].get('code')} type={data['error'].get('type')}")
+        raise IGAPIError(
+            f"IG container creation error: HTTP {resp.status_code} "
+            f"code={data['error'].get('code')} type={data['error'].get('type')}",
+            response_data=_extract_ig_error_data(resp),
+        )
     container_id = data.get("id")
     if not container_id:
         raise RuntimeError("IG container creation: no container id in response")
@@ -309,7 +344,11 @@ def ig_publish(ig_user_id: str, access_token: str, container_id: str) -> str:
     _safe_raise(resp, "IG publish")
     data = resp.json()
     if "error" in data:
-        raise RuntimeError(f"IG publish error: HTTP {resp.status_code} code={data['error'].get('code')} type={data['error'].get('type')}")
+        raise IGAPIError(
+            f"IG publish error: HTTP {resp.status_code} "
+            f"code={data['error'].get('code')} type={data['error'].get('type')}",
+            response_data=_extract_ig_error_data(resp),
+        )
     media_id = data.get("id")
     if not media_id:
         raise RuntimeError("IG publish: no media id in response")
@@ -418,6 +457,7 @@ def _process_live(
         duration_ms = int((time.monotonic() - start_time) * 1000)
         error_str = _redact(str(exc), access_token)
         log.error(f"Publish failed (pre-media_id): {error_str}")
+        ig_error_data: Optional[dict] = getattr(exc, "response_data", None)
         write_attempt(
             supabase,
             queue_id=queue_id,
@@ -426,6 +466,7 @@ def _process_live(
             duration_ms=duration_ms,
             container_id=container_id,
             error_message=error_str,
+            response_data=ig_error_data,
         )
         mark_failed_or_retry(
             supabase,
