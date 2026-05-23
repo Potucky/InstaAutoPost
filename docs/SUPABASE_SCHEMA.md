@@ -244,9 +244,9 @@ Migration `20260523000000_create_ig_schedule_slots.sql` adds:
 | Field | Purpose |
 | --- | --- |
 | `id` | Primary key (gen_random_uuid). |
-| `slot_date` | Calendar date of the slot. |
+| `slot_date` | Local America/New_York posting calendar date (YYYY-MM-DD). Used for calendar grouping; compare as a string, not via `new Date()`. |
 | `slot_window` | `morning`, `lunch`, or `evening`. |
-| `scheduled_at` | Exact UTC timestamptz for this slot (unique). |
+| `scheduled_at` | Exact UTC timestamptz publish instant. Use for time display, upcoming filtering, and ordering. Do not use to determine the calendar day. |
 | `content_id` | FK to `ig_content_library`; null when empty. Unique across active statuses (assigned, queued). |
 | `queue_id` | FK to `ig_publishing_queue`; null until linked. Unique where not null. |
 | `slot_status` | `empty`, `assigned`, `queued`, `published`, `failed`, or `cancelled`. |
@@ -255,6 +255,8 @@ Migration `20260523000000_create_ig_schedule_slots.sql` adds:
 | `updated_at` | Auto-updated on any row change. |
 
 **Purpose**: user-facing calendar/schedule plan. `ig_publishing_queue` remains the worker queue. Slots start as `empty`; content and queue rows are assigned in a separate step.
+
+**Frontend calendar grouping rule**: group slots by `slot_date` string equality (e.g. `slot.slot_date === 'YYYY-MM-DD'`). Do not parse `slot_date` via `new Date(slot_date)` for grouping — JavaScript UTC date-only parsing shifts dates for users west of UTC. Filter the month query using `slot_date` (`.gte`/`.lte` on the `YYYY-MM-DD` string). Use `scheduled_at` only for exact-time display and ordering within a day.
 
 **Indexes**: `slot_date`, `scheduled_at`, `slot_status`, `content_id`, `queue_id`.
 

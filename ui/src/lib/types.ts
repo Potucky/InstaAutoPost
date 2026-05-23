@@ -53,8 +53,10 @@ export type SlotStatus = 'empty' | 'assigned' | 'queued' | 'published' | 'failed
 
 export interface ScheduleSlot {
   id: string;
+  // YYYY-MM-DD posting date in America/New_York; compare as string, never via new Date()
   slot_date: string;
   slot_window: 'morning' | 'lunch' | 'evening';
+  // exact timestamptz/UTC publish instant; use for time display, filtering, and ordering
   scheduled_at: string;
   content_id: string | null;
   queue_id: string | null;

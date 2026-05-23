@@ -25,6 +25,10 @@ const BADGE_STYLES: Record<SlotStatus, string> = {
   cancelled: 'bg-gray-100 text-gray-500',
 }
 
+function dayKey(day: Date): string {
+  return format(day, 'yyyy-MM-dd')
+}
+
 function formatNY(iso: string): string {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/New_York',
@@ -126,11 +130,14 @@ export default function CalendarPage() {
   // Current month slots for the calendar grid — re-fetches on month navigation
   useEffect(() => {
     async function loadMonth() {
+      const monthStartKey = format(startOfMonth(current), 'yyyy-MM-dd')
+      const monthEndKey = format(endOfMonth(current), 'yyyy-MM-dd')
       const { data, error: monthErr } = await supabase
         .from('ig_schedule_slots')
         .select('*, ig_content_library(id, title, media_type)')
-        .gte('scheduled_at', startOfMonth(current).toISOString())
-        .lte('scheduled_at', endOfMonth(current).toISOString())
+        .gte('slot_date', monthStartKey)
+        .lte('slot_date', monthEndKey)
+        .order('slot_date', { ascending: true })
         .order('scheduled_at', { ascending: true })
       if (!monthErr) setMonthSlots((data ?? []) as ScheduleSlot[])
     }
@@ -143,7 +150,7 @@ export default function CalendarPage() {
   const paddingDays = Array.from({ length: startPad })
 
   function slotsForDay(day: Date) {
-    return monthSlots.filter((s) => isSameDay(new Date(s.slot_date), day))
+    return monthSlots.filter((s) => s.slot_date === dayKey(day))
   }
 
   const selectedSlots = selected ? slotsForDay(selected) : []
