@@ -29,6 +29,7 @@ export default function ContentLibrary() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [publishingNow, setPublishingNow] = useState<string | null>(null)
+  const [publishConfirmItem, setPublishConfirmItem] = useState<ContentItem | null>(null)
 
   async function load() {
     setLoading(true)
@@ -311,7 +312,7 @@ export default function ContentLibrary() {
                           <>
                             <button
                               type="button"
-                              onClick={() => handlePublishNow(item)}
+                              onClick={() => setPublishConfirmItem(item)}
                               disabled={publishingNow === item.id}
                               className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-40"
                             >
@@ -347,6 +348,38 @@ export default function ContentLibrary() {
           )}
         </div>
       </div>
+
+      {publishConfirmItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-sm mx-4 p-6 space-y-4">
+            <h2 className="text-sm font-semibold text-slate-900">Confirm publish</h2>
+            <p className="text-sm text-slate-700">{publishConfirmItem.title}</p>
+            <p className="text-xs text-amber-600 font-medium">This may publish to Instagram immediately.</p>
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => setPublishConfirmItem(null)}
+                disabled={publishingNow === publishConfirmItem.id}
+                className="text-xs px-3 py-1.5 rounded-md border border-gray-200 text-slate-600 hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const item = publishConfirmItem
+                  setPublishConfirmItem(null)
+                  handlePublishNow(item)
+                }}
+                disabled={publishingNow === publishConfirmItem.id}
+                className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 font-medium disabled:opacity-40"
+              >
+                {publishingNow === publishConfirmItem.id ? '…' : 'Confirm Publish'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
