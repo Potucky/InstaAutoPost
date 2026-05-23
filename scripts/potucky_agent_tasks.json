@@ -14,9 +14,134 @@
   ],
   "tasks": [
     {
+      "id": "IAP-005",
+      "title": "Tiny auto-mode smoke test",
+      "status": "DONE",
+      "branch": "agent/iap-005-smoke-test",
+      "mode": "implementation",
+      "priority": "high",
+      "allowed_files": [
+        "docs/AGENT_RUN_REPORT.md"
+      ],
+      "forbidden_actions": [
+        "publish",
+        "deploy",
+        "supabase_write",
+        "migration_apply",
+        "secret_print",
+        "env_print",
+        "github_actions_run",
+        "commit",
+        "push",
+        "merge",
+        "write_app_code",
+        "write_workflow_code",
+        "write_supabase_code",
+        "write_ui_code",
+        "install_packages"
+      ],
+      "validation_commands": [
+        "python3 scripts/potucky_orchestrator.py status",
+        "python3 scripts/potucky_orchestrator.py print-next",
+        "git status --short"
+      ],
+      "done_requires": [
+        "executor_report",
+        "codex_review_pass",
+        "manual_approval_for_final_status"
+      ],
+      "notes": "Tiny docs-only smoke test for automatic Claude + Codex orchestration. Goal: verify that auto-run-next can complete a full TODO -> NEEDS_USER_APPROVAL cycle on a minimal task without timing out. Executor must append exactly one line to docs/AGENT_RUN_REPORT.md: 'IAP-005 auto-mode smoke test executor ran successfully.' No other files may be written. Run with short timeouts: POTUCKY_CLAUDE_TIMEOUT_SECONDS=120 POTUCKY_CODEX_TIMEOUT_SECONDS=120 python3 scripts/potucky_orchestrator.py auto-run-next"
+    },
+    {
+      "id": "IAP-004",
+      "title": "Orchestrator auto-mode hardening and smoke test",
+      "status": "DONE",
+      "branch": "agent/iap-004-orchestrator-auto-mode",
+      "mode": "implementation",
+      "priority": "high",
+      "allowed_files": [
+        "scripts/potucky_orchestrator.py",
+        "scripts/potucky_agent_tasks.json",
+        "docs/AGENT_RUN_REPORT.md",
+        "docs/POTUCKY_ORCHESTRATOR.md",
+        "docs/AGENT_REVIEW_RULES.md"
+      ],
+      "forbidden_actions": [
+        "publish",
+        "deploy",
+        "supabase_write",
+        "migration_apply",
+        "secret_print",
+        "env_print",
+        "github_actions_run",
+        "commit",
+        "push",
+        "merge",
+        "write_app_code",
+        "write_workflow_code",
+        "write_supabase_code",
+        "write_ui_code",
+        "install_packages"
+      ],
+      "validation_commands": [
+        "python3 scripts/potucky_orchestrator.py status",
+        "python3 scripts/potucky_orchestrator.py doctor",
+        "python3 scripts/potucky_orchestrator.py print-next",
+        "python3 -m py_compile scripts/potucky_orchestrator.py",
+        "git status --short"
+      ],
+      "done_requires": [
+        "executor_report",
+        "codex_review_pass",
+        "manual_approval_for_final_status"
+      ],
+      "notes": "Harden POTUCKY ORCHESTRATOR auto-mode so future tasks run automatically without manual copy/paste. Key changes: (1) Codex review prompt now includes KNOWN ORCHESTRATION ARTIFACTS section explaining that scripts/potucky_agent_tasks.json status updates and generated prompt files are managed by the orchestrator, not the executor, and must not trigger FAIL. (2) AUDIT STEPS Step 1 updated to reference this section. State machine transitions (auto-execute, auto-review, mark-done guard) were already correct. Goal: verify the fixed orchestrator can complete a full TODO -> NEEDS_USER_APPROVAL automated cycle."
+    },
+    {
+      "id": "IAP-003",
+      "title": "Verify live migration state and dry-run publisher safety",
+      "status": "DONE",
+      "branch": "agent/iap-001-orchestrator-bootstrap",
+      "mode": "read_only",
+      "priority": "high",
+      "allowed_files": [
+        "scripts/potucky_agent_tasks.json",
+        "docs/AGENT_RUN_REPORT.md"
+      ],
+      "forbidden_actions": [
+        "publish",
+        "deploy",
+        "supabase_write",
+        "migration_apply",
+        "secret_print",
+        "env_print",
+        "github_actions_run",
+        "commit",
+        "push",
+        "merge",
+        "write_app_code",
+        "write_workflow_code",
+        "write_supabase_code",
+        "write_ui_code",
+        "install_packages"
+      ],
+      "validation_commands": [
+        "python3 scripts/potucky_orchestrator.py status",
+        "python3 scripts/potucky_orchestrator.py doctor",
+        "python3 scripts/potucky_orchestrator.py print-next",
+        "git status --short"
+      ],
+      "done_requires": [
+        "executor_report",
+        "codex_review_pass",
+        "manual_approval_for_final_status"
+      ],
+      "notes": "Read-only safety inspection. Goal: determine whether the project is safe to move toward real Instagram API publishing by checking (1) migration drift \u2014 compare supabase/migrations/ against live schema facts in CLAUDE.md and docs/SUPABASE_SCHEMA.md; (2) dry-run behavior \u2014 confirm INSTAGRAM_API_ENABLED guard in scripts/instaautopost_publisher.py is correct and cannot accidentally publish; (3) RLS and secrets exposure \u2014 check for any Supabase service role key usage in UI code, unguarded API calls, or logged secrets; (4) publisher safety \u2014 verify the worker respects published_at and external_media_id guards, and that retry logic cannot duplicate a real publish. Report findings in docs/AGENT_RUN_REPORT.md with clear SAFE / RISK / BLOCKER labels per item. Do not connect to live services. Read local files only. Do not print secrets, tokens, or .env values."
+    },
+    {
       "id": "IAP-002",
       "title": "Read-only audit of current InstaAutoPost pipeline",
-      "status": "TODO",
+      "status": "DONE",
       "branch": "agent/iap-001-orchestrator-bootstrap",
       "mode": "read_only",
       "priority": "high",
@@ -51,7 +176,7 @@
         "codex_review_pass",
         "manual_approval_for_final_status"
       ],
-      "notes": "Read-only pipeline audit. No code changes allowed — only docs/AGENT_RUN_REPORT.md may be written. Audit must cover: project structure, GitHub Actions workflows (instaautopost-publisher.yml), Instagram publish flow (scripts/instaautopost_publisher.py), Supabase usage and schema assumptions, environment/secrets assumptions, dry-run/safe mode behavior, logs and secret exposure risks, production publish risks, old naming drift, and next safest implementation step. Do not connect to live services. Read local files only using safe commands (cat, grep, find, git). Do not print secrets, tokens, or .env values."
+      "notes": "Read-only pipeline audit. No code changes allowed \u2014 only docs/AGENT_RUN_REPORT.md may be written by the executor. Orchestration artifacts that may also appear in git status (managed by potucky_orchestrator.py, NOT executor writes): scripts/potucky_agent_tasks.json (status updated by run-next), scripts/potucky_agent_prompts/IAP-002_claude_executor_prompt.md and IAP-002_codex_review_prompt.md (generated by prepare-prompts). These are expected artifacts and must not be treated as executor scope violations by Codex, provided they contain no app/pipeline code changes. Audit must cover: project structure, GitHub Actions workflows (instaautopost-publisher.yml), Instagram publish flow (scripts/instaautopost_publisher.py), Supabase usage and schema assumptions, environment/secrets assumptions, dry-run/safe mode behavior, logs and secret exposure risks, production publish risks, old naming drift, and next safest implementation step. Do not connect to live services. Read local files only using safe commands (cat, grep, find, git). Do not print secrets, tokens, or .env values."
     },
     {
       "id": "IAP-001",

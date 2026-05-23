@@ -188,6 +188,16 @@ must review the Codex output and run `mark-done` intentionally.
 python3 scripts/potucky_orchestrator.py auto-run-next
 ```
 
+**Smoke testing with reduced timeouts** — set env vars before the command to
+override the defaults (600s Claude, 300s Codex) for fast validation:
+
+```bash
+POTUCKY_CLAUDE_TIMEOUT_SECONDS=120 POTUCKY_CODEX_TIMEOUT_SECONDS=120 \
+  python3 scripts/potucky_orchestrator.py auto-run-next
+```
+
+The active timeout values are printed by `doctor` and by each execution step.
+
 1. Safety lock check.
 2. Finds the first `TODO` or `NEEDS_FIX` task.
 3. Runs `auto-execute` for that task (one execution max).
