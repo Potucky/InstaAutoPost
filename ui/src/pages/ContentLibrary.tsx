@@ -52,7 +52,7 @@ export default function ContentLibrary() {
       const map = new Map<string, SlotInfo>()
       for (const s of slotRows ?? []) {
         if (s.content_id) {
-          const qRow = s.ig_publishing_queue as { queue_status: string } | null
+          const qRow = s.ig_publishing_queue as unknown as { queue_status: string } | null
           map.set(s.content_id, {
             scheduled_at: s.scheduled_at,
             slot_window: s.slot_window,
