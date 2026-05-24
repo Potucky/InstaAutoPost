@@ -51,6 +51,7 @@ InstaAutoPost/
       generate_schedule_slots.py
       assign_content_to_schedule_slots.py
       schedule_draft_content.py
+      report_orphan_storage_files.py   ← report-only orphan detection (no deletion)
     local/
       analyze_raw_media.py
       prepare_test_video_batch.py
@@ -90,6 +91,10 @@ Implemented:
 - Live env var validation before queue claim.
 - Signed URL and token log redaction.
 - Queue failure field is `failure_reason` (UI and worker aligned).
+- Upload validation: MP4 only, max 45 MB. Non-MP4, empty, and oversized files are rejected with a user-facing error before any upload attempt.
+- Storage path uses `crypto.randomUUID()` (with UUID-compatible fallback); no anonymous path fallback — requires authenticated user.
+- Best-effort orphan cleanup on Clear/Cancel and DB insert failure: only removes the uploaded object if no `ig_content_library` row references its URL.
+- Report-only orphan detection script: `scripts/admin/report_orphan_storage_files.py` lists unreferenced Storage objects older than 24h. No deletion is performed. Destructive cleanup is a future explicit reviewed operation.
 
 Blocked before real Instagram publishing:
 

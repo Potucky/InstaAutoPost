@@ -5,6 +5,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 
 const STORAGE_BUCKET = 'instaautopost-media'
+const MAX_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024
 
 interface FormData {
   title: string
@@ -30,6 +31,14 @@ function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, '_').replace(/_{2,}/g, '_')
 }
 
+function fallbackUUID(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0
+    const v = c === 'x' ? r : (r & 0x3) | 0x8
+    return v.toString(16)
+  })
+}
+
 export default function UploadVideo() {
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -43,6 +52,7 @@ export default function UploadVideo() {
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploadedPath, setUploadedPath] = useState<string | null>(null)
+  const [uploadedPublicUrl, setUploadedPublicUrl] = useState<string | null>(null)
 
   function set(field: keyof FormData, value: string) {
     setForm((f) => ({ ...f, [field]: value }))
@@ -59,16 +69,49 @@ export default function UploadVideo() {
     const file = e.target.files?.[0]
     if (!file) return
 
+    if (!user?.id) {
+      setUploadError('You must be signed in to upload files.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
+    const isMP4 =
+      file.type === 'video/mp4' ||
+      (file.type === '' && file.name.toLowerCase().endsWith('.mp4'))
+
+    if (file.size === 0) {
+      setUploadError('Selected file is empty.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    if (!isMP4) {
+      setUploadError('Only MP4 files are accepted.')
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+    if (file.size > MAX_VIDEO_UPLOAD_BYTES) {
+      setUploadError(
+        `File exceeds the 45 MB upload limit (${(file.size / 1024 / 1024).toFixed(1)} MB).`
+      )
+      if (fileInputRef.current) fileInputRef.current.value = ''
+      return
+    }
+
     setSelectedFile(file)
     setUploadError(null)
     setUploadedPath(null)
+    setUploadedPublicUrl(null)
     set('video_url', '')
     setUploading(true)
 
-    const userId = user?.id ?? 'anonymous'
-    const timestamp = Date.now()
     const safeName = sanitizeFilename(file.name)
-    const storagePath = `${userId}/${timestamp}_${safeName}`
+    let uuid: string
+    try {
+      uuid = crypto.randomUUID()
+    } catch {
+      uuid = fallbackUUID()
+    }
+    const storagePath = `${user.id}/${uuid}_${safeName}`
 
     const { error: uploadErr } = await supabase.storage
       .from(STORAGE_BUCKET)
@@ -76,6 +119,8 @@ export default function UploadVideo() {
 
     if (uploadErr) {
       setUploadError(`Upload failed: ${uploadErr.message}`)
+      setSelectedFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
       setUploading(false)
       return
     }
@@ -85,16 +130,42 @@ export default function UploadVideo() {
       .getPublicUrl(storagePath)
 
     setUploadedPath(storagePath)
+    setUploadedPublicUrl(urlData.publicUrl)
     set('video_url', urlData.publicUrl)
     setUploading(false)
   }
 
-  function clearUpload() {
+  async function bestEffortRemoveUpload(path: string, publicUrl: string) {
+    try {
+      const { data: rows, error: lookupErr } = await supabase
+        .from('ig_content_library')
+        .select('id')
+        .eq('video_url', publicUrl)
+        .limit(1)
+      if (lookupErr) return
+      if (rows?.length === 0) {
+        await supabase.storage.from(STORAGE_BUCKET).remove([path])
+      }
+    } catch {
+      // Best-effort; ignore cleanup errors
+    }
+  }
+
+  async function clearUpload() {
+    const pathToRemove = uploadedPath
+    const urlToCheck = uploadedPublicUrl
+    const currentUrl = form.video_url
+
     setSelectedFile(null)
     setUploadedPath(null)
+    setUploadedPublicUrl(null)
     setUploadError(null)
     set('video_url', '')
     if (fileInputRef.current) fileInputRef.current.value = ''
+
+    if (pathToRemove && urlToCheck && currentUrl === urlToCheck) {
+      await bestEffortRemoveUpload(pathToRemove, urlToCheck)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -120,7 +191,29 @@ export default function UploadVideo() {
     })
 
     if (err) {
-      setError(err.message)
+      let errorMsg = err.message
+      if (uploadedPath && uploadedPublicUrl && form.video_url.trim() === uploadedPublicUrl) {
+        try {
+          const { data: rows, error: lookupErr } = await supabase
+            .from('ig_content_library')
+            .select('id')
+            .eq('video_url', uploadedPublicUrl)
+            .limit(1)
+          if (lookupErr || rows == null) {
+            errorMsg += ' Cleanup lookup failed; manual storage cleanup may be needed.'
+          } else if (rows.length === 0) {
+            const { error: removeErr } = await supabase.storage
+              .from(STORAGE_BUCKET)
+              .remove([uploadedPath])
+            if (removeErr) {
+              errorMsg += ' Storage cleanup may be needed for the uploaded file.'
+            }
+          }
+        } catch {
+          errorMsg += ' Storage cleanup may be needed for the uploaded file.'
+        }
+      }
+      setError(errorMsg)
       setSubmitting(false)
       return
     }
@@ -186,7 +279,7 @@ export default function UploadVideo() {
                 ref={fileInputRef}
                 id="video_file"
                 type="file"
-                accept="video/*"
+                accept="video/mp4,.mp4"
                 className="hidden"
                 onChange={handleFileSelect}
                 disabled={uploading}
@@ -236,7 +329,7 @@ export default function UploadVideo() {
                 <p className="text-xs text-red-600 mt-1">{uploadError}</p>
               )}
               <p className="text-xs text-slate-400 mt-1">
-                Uploads to Supabase Storage. Video URL is filled automatically after upload.
+                MP4 only, max 45 MB. Uploads to Supabase Storage; URL is filled automatically.
               </p>
             </div>
 
@@ -324,7 +417,16 @@ export default function UploadVideo() {
               </button>
               <button
                 type="button"
-                onClick={() => navigate('/content')}
+                onClick={() => {
+                  const path = uploadedPath
+                  const url = uploadedPublicUrl
+                  const cur = form.video_url
+                  if (path && url && cur === url) {
+                    void bestEffortRemoveUpload(path, url)
+                  }
+                  navigate('/content')
+                }}
+                disabled={uploading}
                 className="btn-secondary"
               >
                 Cancel

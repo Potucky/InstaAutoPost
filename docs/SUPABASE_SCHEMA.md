@@ -301,11 +301,38 @@ Migration `20260522000000_create_media_storage_bucket.sql` adds:
 | --- | --- |
 | Bucket name | `instaautopost-media` |
 | Visibility | **Public** |
-| Object path pattern | `{user_uuid}/{timestamp}_{sanitized_filename}` |
+| Object path pattern | `{user.id}/{uuid}_{sanitized_filename}` |
 
-**Why public**: Instagram's Graph API must fetch the video from `video_url` at publish time. Signed URLs from a private bucket expire before a scheduled publish and cannot be stored durably. Public bucket with non-guessable paths (UUID + timestamp) is the correct trade-off for content intended to be publicly posted anyway.
+**Why public**: Instagram's Graph API must fetch the video from `video_url` at publish time. Signed URLs from a private bucket expire before a scheduled publish and cannot be stored durably. Public bucket with non-guessable paths (UUID + sanitized filename) is the correct trade-off for content intended to be publicly posted anyway.
 
 **Upload/update/delete policy**: Only admin users (in `public.instaautopost_admins`) may upload, update, or delete objects. Hardened from any-authenticated in migration `20260523001000_harden_admin_only_rls.sql`.
+
+**Upload validation (UI)**:
+
+| Rule | Value |
+| --- | --- |
+| Accepted format | MP4 only (`video/mp4` or `.mp4` extension when `file.type` is empty) |
+| Maximum file size | 45 MB (`MAX_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024`) |
+| Empty file | Rejected |
+| Missing user session | Rejected — anonymous path fallback removed |
+| Storage path | `{user.id}/{uuid}_{sanitized_filename}` (`crypto.randomUUID()` when available; UUID-compatible fallback otherwise) |
+
+Validation is enforced in `ui/src/pages/UploadVideo.tsx` before any upload attempt. Non-MP4, empty, oversized, and unauthenticated upload attempts show a user-facing `uploadError` and do not call Supabase Storage.
+
+**Best-effort orphan cleanup (UI)**:
+
+An "orphan" is a Storage object whose path is not referenced by any `ig_content_library.video_url` row. Orphans can appear if a file is uploaded but the subsequent DB insert fails, or if the user clears/cancels before saving.
+
+The UI performs a best-effort cleanup in two situations:
+
+1. **DB insert failure**: if the uploaded public URL still matches the form `video_url`, the UI queries `ig_content_library` for that URL. If no row references it, the uploaded object is removed. If the lookup or removal fails, the original DB error is preserved and a short note ("Storage cleanup may be needed") is appended.
+2. **Clear uploaded file (X button) or Cancel**: same guard — queries the content library before removing. State is cleared immediately; the removal runs in the background.
+
+Cleanup is best-effort only. It is not a substitute for periodic orphan detection.
+
+**Orphan detection script**: `scripts/admin/report_orphan_storage_files.py` — report-only, no deletion. Lists Storage objects older than a configurable grace period (default: 24h) whose paths do not appear in any `ig_content_library` row. Outputs a plain-text report and prints "No files deleted; report only." Test-import carousel secondary images may appear as intentional unlinked objects.
+
+**Destructive cleanup**: not implemented. Any bulk deletion of orphan objects must be a future explicit reviewed operation, implemented as a separate script and run only after pre-flight verification.
 
 **Manual Supabase step required**: Apply this migration in the Supabase dashboard SQL editor, or if bucket creation via SQL INSERT is blocked by the managed environment, create the bucket manually (Storage > New Bucket > Name: `instaautopost-media` > Public: ON) and then apply only the policy statements.
 

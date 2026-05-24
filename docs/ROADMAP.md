@@ -38,6 +38,14 @@ Implemented (Task 9):
 - `scripts/README.md` added with a safety matrix covering who calls each script, whether it can mutate Supabase, and the rule that the GitHub Actions workflow must call only `scripts/instaautopost_publisher.py`.
 - Production automation must not invoke scripts in `scripts/admin/` or `scripts/local/`.
 
+Implemented (Task 10):
+
+- Upload validation: `UploadVideo.tsx` now rejects empty files, non-MP4 files, and files over 45 MB with a user-facing error before any upload attempt. Accepted formats: `video/mp4` or `.mp4` extension fallback when `file.type` is empty.
+- Anonymous path fallback removed: upload requires an authenticated user (`user.id`). Storage path uses `crypto.randomUUID()` with a UUID-compatible fallback.
+- Best-effort orphan cleanup: on DB insert failure and on Clear/Cancel, the UI checks whether the uploaded object is referenced in `ig_content_library` before attempting removal. Cleanup errors do not mask the original DB error.
+- Report-only orphan detection: `scripts/admin/report_orphan_storage_files.py` lists Storage objects in `instaautopost-media` that are older than 24h (configurable) and not referenced by any content library row. No files are deleted; report only.
+- Cleanup deletion is not implemented. Any destructive orphan cleanup must be a future explicit reviewed operation.
+
 Blocked:
 
 - First real Instagram publish.
