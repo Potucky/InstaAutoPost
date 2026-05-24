@@ -157,14 +157,33 @@ export default function ContentLibrary() {
       })
 
       if (fnErr) {
-        // Queue row exists but the workflow trigger failed.
-        // The user can trigger manually from GitHub Actions using the queue_id.
-        alert(
-          'Queue item created but the publish workflow could not be triggered automatically.\n\n' +
-          'To publish manually:\n' +
-          'GitHub Actions → InstaAutoPost Publisher → Run workflow\n' +
-          `Set queue_id to: ${inserted.id}`
-        )
+        // Workflow dispatch failed — attempt to cancel the inserted queue row so it
+        // does not become eligible for automatic processing. Guards prevent cancelling
+        // if the worker already claimed the row (published_at or external_media_id set).
+        const { data: reverted, error: revertErr } = await supabase
+          .from('ig_publishing_queue')
+          .update({ queue_status: 'cancelled' })
+          .eq('id', inserted.id)
+          .is('published_at', null)
+          .is('external_media_id', null)
+          .in('queue_status', ['ready', 'scheduled'])
+          .select('id')
+
+        if (!revertErr && reverted && reverted.length > 0) {
+          alert(
+            'The publish workflow could not be triggered. The queue item has been cancelled.\n\n' +
+            'Investigate the edge function or GitHub Actions configuration, then try again.'
+          )
+        } else {
+          // Cancellation failed or affected zero rows — row may still be live-eligible.
+          alert(
+            'WARNING: The publish workflow could not be triggered and the queue row could not be cancelled.\n\n' +
+            'This queue item may still be live-eligible and could be picked up by the next worker run.\n\n' +
+            'Immediately open the Publishing Queue and manually cancel this item if it is still active.\n\n' +
+            `Queue item ID: ${inserted.id}` +
+            (revertErr ? `\nCancel error: ${revertErr.message}` : '')
+          )
+        }
       } else {
         alert('Publish workflow triggered! Check the Publishing Queue for live status.')
       }

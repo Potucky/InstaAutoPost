@@ -38,18 +38,38 @@ export default function PublishingQueue() {
 
   async function handleSchedule(id: string) {
     if (!scheduleAt) return
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('ig_publishing_queue')
       .update({ queue_status: 'scheduled', scheduled_at: new Date(scheduleAt).toISOString() })
       .eq('id', id)
-    if (error) alert(error.message)
+      .eq('queue_status', 'draft')
+      .is('published_at', null)
+      .is('external_media_id', null)
+      .select('id')
+    if (error) {
+      alert(error.message)
+    } else if (!data || data.length === 0) {
+      alert('Could not schedule — item may already be published, processing, or no longer a draft.')
+    }
     setSchedulingId(null)
     setScheduleAt('')
     load()
   }
 
   async function handleMarkReady(id: string) {
-    await supabase.from('ig_publishing_queue').update({ queue_status: 'ready' }).eq('id', id)
+    const { data, error } = await supabase
+      .from('ig_publishing_queue')
+      .update({ queue_status: 'ready' })
+      .eq('id', id)
+      .eq('queue_status', 'scheduled')
+      .is('published_at', null)
+      .is('external_media_id', null)
+      .select('id')
+    if (error) {
+      alert(error.message)
+    } else if (!data || data.length === 0) {
+      alert('Could not mark ready — item may already be published, processing, or no longer scheduled.')
+    }
     load()
   }
 

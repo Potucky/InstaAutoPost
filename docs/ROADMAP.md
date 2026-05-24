@@ -10,7 +10,7 @@ Implemented:
 - Dry-run default controlled by `INSTAGRAM_API_ENABLED`.
 - Instagram Graph API live path in worker.
 - GitHub Actions workflow for manual worker execution.
-- Automatic workflow schedule runs every 5 minutes.
+- Publisher workflow has a 5-minute cron defined in YAML; the entire `instaautopost-publisher.yml` workflow is currently manually disabled in GitHub Actions for safety. While disabled, neither the cron nor `workflow_dispatch` is available. Re-enabling the workflow resumes the cron.
 
 Partially implemented:
 

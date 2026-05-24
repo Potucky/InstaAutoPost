@@ -90,9 +90,21 @@ Deno.serve(async (req: Request) => {
     return jsonResponse({ error: "Invalid or expired session" }, 401);
   }
 
-  // Validate queue row with service role (bypasses RLS)
+  // Require the caller to be a registered admin.
+  // Uses service role to bypass RLS on instaautopost_admins.
   const adminClient = createClient(supabaseUrl, serviceKey);
 
+  const { data: adminRow } = await adminClient
+    .from("instaautopost_admins")
+    .select("user_id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  if (!adminRow) {
+    return jsonResponse({ error: "Forbidden — admin access required" }, 403);
+  }
+
+  // Validate queue row with service role (bypasses RLS)
   const { data: row, error: rowError } = await adminClient
     .from("ig_publishing_queue")
     .select(

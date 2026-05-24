@@ -215,8 +215,9 @@ Workflow:
 
 Current state:
 
-- Manual `workflow_dispatch` is available (optional `queue_id` input only).
-- Automatic schedule runs every 5 minutes.
+- The entire `instaautopost-publisher.yml` workflow is currently manually disabled in GitHub Actions for safety. While disabled, neither the cron schedule nor `workflow_dispatch` from the UI or API is available — GitHub will not execute the workflow in either mode. Do not re-enable without explicit authorization.
+- A 5-minute cron schedule (`*/5 * * * *`) is defined in the YAML. Re-enabling the workflow in GitHub Actions also re-enables this cron schedule.
+- `workflow_dispatch` (optional `queue_id` input) is defined in the YAML but is unavailable while the workflow is disabled.
 - Single `publish` job — always live (`INSTAGRAM_API_ENABLED=true`). No `instagram-live` environment gate.
 - Workflow installs Python dependencies from `scripts/requirements.txt`.
 - Workflow runs `python scripts/instaautopost_publisher.py`.
@@ -233,5 +234,5 @@ Current state:
 - [x] Migration 20260516002000 exists in repo and applied during dev/local verification.
 - [ ] Migration 20260516002000 confirmed applied in production Supabase instance.
 - [ ] Dry-run succeeds on the intended queue row.
-- [x] Workflow schedule state is intentional (automatic cron runs every 5 minutes).
+- [x] Workflow state documented: the entire `instaautopost-publisher.yml` workflow is manually disabled in GitHub Actions for safety; cron and `workflow_dispatch` are both unavailable while disabled.
 - [ ] User explicitly confirms live publishing.

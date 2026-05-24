@@ -14,6 +14,7 @@ Does NOT:
 """
 
 import argparse
+import hashlib
 import os
 import random
 import sys
@@ -97,8 +98,10 @@ def generate_slots(
         for window_name in window_names:
             w_start, w_end = windows[window_name]
 
-            # Deterministic per (date, window) using derived seed.
-            local_seed = hash((seed, current.isoformat(), window_name)) & 0xFFFFFFFF
+            # Deterministic per (date, window) using SHA-256 derived seed.
+            # Python's hash() is randomized by PYTHONHASHSEED — use SHA-256 for stability.
+            _hash_input = f"{seed}:{current.isoformat()}:{window_name}".encode()
+            local_seed = int(hashlib.sha256(_hash_input).hexdigest(), 16) & 0xFFFFFFFF
             local_rng = random.Random(local_seed)
 
             # Try up to 3600 offsets to find a unique second.
