@@ -1,7 +1,7 @@
 name: InstaAutoPost Publisher
 
 on:
-  # Runs every 5 minutes; each execution processes at most one due queue item.
+  # Runs every 5 minutes; each execution processes at most one due queue item. Schedule refreshed 2026-05-24.
   schedule:
     - cron: '*/5 * * * *'
   workflow_dispatch:
