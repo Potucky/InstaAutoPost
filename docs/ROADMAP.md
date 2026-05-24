@@ -32,6 +32,13 @@ Implemented (Task 8):
 - Script live guard: worker checks `INSTAAUTOPOST_LIVE_CONFIRMATION == 'PUBLISH LIVE'` before any Supabase claim. Missing or wrong value → log error and exit 1.
 - Workflow split into two jobs: `publish_dry_run` (no environment, runs when `live_mode != true`) and `publish_live` (`environment: instagram-live`, runs when `live_mode == true`). Dry-run bypasses the environment gate entirely. The `instagram-live` environment must be created in Settings > Environments with at least one required reviewer before live publishing begins.
 
+Implemented (Publish Now live confirmation fix):
+
+- UI "Publish Now" confirmation modal now requires typing `PUBLISH LIVE` exactly before the button enables.
+- Edge function (`trigger-publish`) validates `live_confirmation === "PUBLISH LIVE"` server-side and rejects requests that omit or misspell it (HTTP 400) — before dispatching GitHub Actions.
+- Edge function now passes `live_confirmation` through to the GitHub Actions dispatch inputs so the Python worker's existing phrase check receives the value and can pass.
+- Before this fix: `trigger-publish` dispatched `live_mode=true` with no `live_confirmation`, causing the Python worker to exit before claiming (safe but misleading). After this fix: all three guards (UI, edge function, Python worker) require the same phrase and fail together if it is wrong.
+
 Implemented (Task 9):
 
 - Script separation: production worker stays at `scripts/instaautopost_publisher.py`; manual/admin DB utilities moved to `scripts/admin/`; local/test/diagnostic utilities moved to `scripts/local/`.

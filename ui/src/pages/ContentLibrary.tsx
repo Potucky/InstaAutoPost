@@ -30,6 +30,7 @@ export default function ContentLibrary() {
   const [error, setError] = useState<string | null>(null)
   const [publishingNow, setPublishingNow] = useState<string | null>(null)
   const [publishConfirmItem, setPublishConfirmItem] = useState<ContentItem | null>(null)
+  const [publishConfirmPhrase, setPublishConfirmPhrase] = useState('')
 
   async function load() {
     setLoading(true)
@@ -82,7 +83,7 @@ export default function ContentLibrary() {
     load()
   }
 
-  async function handlePublishNow(item: ContentItem) {
+  async function handlePublishNow(item: ContentItem, liveConfirmation: string) {
     if (publishingNow === item.id) return
     setPublishingNow(item.id)
     try {
@@ -152,7 +153,7 @@ export default function ContentLibrary() {
       // Trigger the publish workflow via the Edge Function.
       // The Edge Function holds the GitHub PAT — no secret is sent from the browser.
       const { error: fnErr } = await supabase.functions.invoke('trigger-publish', {
-        body: { queue_id: inserted.id },
+        body: { queue_id: inserted.id, live_confirmation: liveConfirmation },
       })
 
       if (fnErr) {
@@ -163,7 +164,8 @@ export default function ContentLibrary() {
           'To publish manually:\n' +
           'GitHub Actions → InstaAutoPost Publisher → Run workflow\n' +
           `Set queue_id to: ${inserted.id}\n` +
-          'Set live_mode to: true'
+          'Set live_mode to: true\n' +
+          'Set live_confirmation to: PUBLISH LIVE'
         )
       } else {
         alert('Publish workflow triggered! Check the Publishing Queue for live status.')
@@ -352,13 +354,28 @@ export default function ContentLibrary() {
       {publishConfirmItem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
           <div className="bg-white rounded-xl shadow-xl border border-gray-200 w-full max-w-sm mx-4 p-6 space-y-4">
-            <h2 className="text-sm font-semibold text-slate-900">Confirm publish</h2>
+            <h2 className="text-sm font-semibold text-slate-900">Confirm live publish</h2>
             <p className="text-sm text-slate-700">{publishConfirmItem.title}</p>
-            <p className="text-xs text-amber-600 font-medium">This may publish to Instagram immediately.</p>
+            <p className="text-xs text-amber-600 font-medium">
+              This will publish to Instagram immediately. This action cannot be undone.
+            </p>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-slate-700">
+                Type <span className="font-mono font-bold">PUBLISH LIVE</span> to confirm
+              </label>
+              <input
+                type="text"
+                value={publishConfirmPhrase}
+                onChange={(e) => setPublishConfirmPhrase(e.target.value)}
+                placeholder="PUBLISH LIVE"
+                disabled={publishingNow === publishConfirmItem.id}
+                className="w-full text-xs px-3 py-2 border border-gray-300 rounded-md font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-40"
+              />
+            </div>
             <div className="flex justify-end gap-2 pt-2">
               <button
                 type="button"
-                onClick={() => setPublishConfirmItem(null)}
+                onClick={() => { setPublishConfirmItem(null); setPublishConfirmPhrase('') }}
                 disabled={publishingNow === publishConfirmItem.id}
                 className="text-xs px-3 py-1.5 rounded-md border border-gray-200 text-slate-600 hover:bg-gray-50 disabled:opacity-40"
               >
@@ -368,11 +385,13 @@ export default function ContentLibrary() {
                 type="button"
                 onClick={() => {
                   const item = publishConfirmItem
+                  const phrase = publishConfirmPhrase
                   setPublishConfirmItem(null)
-                  handlePublishNow(item)
+                  setPublishConfirmPhrase('')
+                  handlePublishNow(item, phrase)
                 }}
-                disabled={publishingNow === publishConfirmItem.id}
-                className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 font-medium disabled:opacity-40"
+                disabled={publishingNow === publishConfirmItem.id || publishConfirmPhrase !== 'PUBLISH LIVE'}
+                className="text-xs px-3 py-1.5 rounded-md bg-emerald-600 text-white hover:bg-emerald-700 font-medium disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {publishingNow === publishConfirmItem.id ? '…' : 'Confirm Publish'}
               </button>

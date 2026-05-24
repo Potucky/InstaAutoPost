@@ -60,15 +60,29 @@ Deno.serve(async (req: Request) => {
 
   // Parse and validate request body
   let queue_id: string;
+  let live_confirmation: string;
   try {
     const body = await req.json();
     queue_id = body?.queue_id;
+    live_confirmation = typeof body?.live_confirmation === "string"
+      ? body.live_confirmation
+      : "";
   } catch {
     return jsonResponse({ error: "Invalid request body" }, 400);
   }
 
   if (!queue_id || typeof queue_id !== "string" || queue_id.trim() === "") {
     return jsonResponse({ error: "queue_id is required" }, 400);
+  }
+
+  // Require the explicit live confirmation phrase before dispatching live_mode=true.
+  // This mirrors the check in instaautopost_publisher.py and prevents the workflow
+  // from entering the instagram-live environment gate only to fail at the script guard.
+  if (live_confirmation !== "PUBLISH LIVE") {
+    return jsonResponse(
+      { error: "live_confirmation must be exactly 'PUBLISH LIVE'" },
+      400,
+    );
   }
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -160,6 +174,7 @@ Deno.serve(async (req: Request) => {
       inputs: {
         queue_id: queue_id,
         live_mode: "true",
+        live_confirmation: live_confirmation,
       },
     }),
   });
