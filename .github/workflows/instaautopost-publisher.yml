@@ -1,11 +1,9 @@
 name: InstaAutoPost Publisher
 
 on:
-  # Automatic scheduling temporarily disabled to stop failure email spam.
-  # To restore: uncomment the schedule block below.
-  # schedule:
-  #   # Every 5 minutes — processes one queue item per execution
-  #   - cron: '*/5 * * * *'
+  # Runs every 5 minutes; each execution processes at most one due queue item.
+  schedule:
+    - cron: '*/5 * * * *'
   workflow_dispatch:
     inputs:
       queue_id:
@@ -36,7 +34,7 @@ jobs:
     name: InstaAutoPost Publisher Worker (dry-run)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.inputs.live_mode != 'true' }}
+    if: ${{ github.event.inputs.live_mode != 'true' && github.event_name != 'schedule' }}
 
     steps:
       - name: Checkout repository
@@ -76,7 +74,7 @@ jobs:
     name: InstaAutoPost Publisher Worker (live)
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ github.event.inputs.live_mode == 'true' }}
+    if: ${{ github.event.inputs.live_mode == 'true' || github.event_name == 'schedule' }}
     # Reference the instagram-live environment only when live_mode is true.
     # Dry-run runs use publish_dry_run (above) and bypass this environment gate entirely.
     # Before enabling live publishing, create this environment in
@@ -103,12 +101,11 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           IG_USER_ID: ${{ secrets.IG_USER_ID }}
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
-          # Derived solely from the workflow_dispatch input — no fallback to
-          # vars.INSTAGRAM_API_ENABLED. Dry-run is the default when live_mode is false.
+          # Always true for this job — both live dispatch and cron schedule are live runs.
           INSTAGRAM_API_ENABLED: 'true'
-          # Explicit confirmation phrase checked by the script before any live queue claim.
-          # The script exits 1 if this is absent or does not equal "PUBLISH LIVE".
-          INSTAAUTOPOST_LIVE_CONFIRMATION: ${{ github.event.inputs.live_confirmation }}
+          # For schedule events github.event.inputs is null; supply the phrase directly so
+          # the script's confirmation guard passes on automated cron runs.
+          INSTAAUTOPOST_LIVE_CONFIRMATION: ${{ github.event_name == 'schedule' && 'PUBLISH LIVE' || github.event.inputs.live_confirmation }}
           # When set, the worker processes only this queue item (one-click publish flow).
           # Leave empty for the default "next due item" behaviour.
           TARGET_QUEUE_ID: ${{ github.event.inputs.queue_id }}
