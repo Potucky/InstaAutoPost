@@ -155,7 +155,7 @@ Based on current migration and worker code:
 | --- | --- |
 | `id` | Primary key. |
 | `queue_id` | FK to `ig_publishing_queue`. |
-| `attempted_at` | Attempt timestamp. |
+| `attempted_at` | Legacy attempt timestamp. Column exists in DB (DEFAULT NOW()) but is not used by the worker insert, UI, or TypeScript types. Use `created_at` instead. |
 | `attempt_number` | Attempt sequence number. |
 | `status` | `success`, `failed`, or `dry_run`. |
 | `response_data` | Safe JSON response metadata. |
@@ -165,7 +165,7 @@ Based on current migration and worker code:
 | `duration_ms` | Attempt duration. |
 | `dry_run` | Boolean dry-run flag. |
 | `worker_version` | Worker version string. |
-| `created_at` | Creation timestamp. |
+| `created_at` | Canonical attempt timestamp. Used by the UI (`LogsAttempts`) for ordering and display, and typed in `PublishAttempt` in `ui/src/lib/types.ts`. |
 
 `error_message` is acceptable here if the attempts table supports it.
 

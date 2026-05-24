@@ -173,7 +173,7 @@ All tables are designed for simple Supabase client queries from the UI:
 |--------|------|-------------|
 | `id` | UUID | Primary key |
 | `queue_id` | UUID | FK → ig_publishing_queue |
-| `attempted_at` | TIMESTAMPTZ | When the attempt started |
+| `attempted_at` | TIMESTAMPTZ | Legacy attempt timestamp (DEFAULT NOW()); exists in DB but unused by worker/UI. See `created_at`. |
 | `attempt_number` | INTEGER | Attempt sequence number |
 | `status` | ENUM | `success / failed / dry_run` |
 | `response_data` | JSONB | Safe response metadata (IDs, status codes) |
@@ -183,6 +183,7 @@ All tables are designed for simple Supabase client queries from the UI:
 | `duration_ms` | INTEGER | Processing duration |
 | `dry_run` | BOOLEAN | Was this a dry run |
 | `worker_version` | TEXT | Worker version string |
+| `created_at` | TIMESTAMPTZ | Canonical attempt timestamp. Used by worker insert (DB default), UI ordering, and `PublishAttempt` TypeScript type. |
 
 ---
 
