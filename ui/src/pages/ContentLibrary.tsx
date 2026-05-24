@@ -83,8 +83,15 @@ export default function ContentLibrary() {
     load()
   }
 
+  const isCarouselContent = (item: ContentItem) =>
+    String(item.media_type ?? '').trim().toLowerCase() === 'carousel'
+
   async function handlePublishNow(item: ContentItem) {
     if (publishingNow === item.id) return
+    if (isCarouselContent(item)) {
+      alert('Carousel publishing is not implemented yet.')
+      return
+    }
     setPublishingNow(item.id)
     try {
       // Duplicate guard: reject if an active (non-terminal) queue row already exists.
@@ -195,6 +202,10 @@ export default function ContentLibrary() {
   }
 
   async function handleAddToQueue(item: ContentItem) {
+    if (isCarouselContent(item)) {
+      alert('Carousel publishing is not implemented yet.')
+      return
+    }
     const { error: err } = await supabase.from('ig_publishing_queue').insert({
       content_id: item.id,
       queue_status: 'draft',
@@ -328,7 +339,7 @@ export default function ContentLibrary() {
                           </button>
                         )}
                         {item.content_status === 'approved' && (
-                          String(item.media_type ?? '').trim().toLowerCase() === 'carousel' ? (
+                          isCarouselContent(item) ? (
                             <span
                               className="text-xs text-slate-400 italic whitespace-nowrap"
                               title="Carousel publishing is not implemented yet."
