@@ -221,6 +221,20 @@ def mark_failed_or_retry(
         log.error("Max attempts reached — queue item marked as failed")
 
 
+def terminal_fail_queue_item(
+    supabase: Client,
+    queue_id: str,
+    failure_reason: str,
+) -> None:
+    """Mark a queue item permanently failed with no retry scheduled."""
+    supabase.table("ig_publishing_queue").update({
+        "queue_status": "failed",
+        "failure_reason": failure_reason[:2000],
+        "locked_at": None,
+        "locked_by": None,
+    }).eq("id", queue_id).execute()
+
+
 def write_attempt(
     supabase: Client,
     queue_id: str,
@@ -461,16 +475,34 @@ def ig_publish(ig_user_id: str, access_token: str, container_id: str) -> str:
 # ---------------------------------------------------------------------------
 # Processing logic
 # ---------------------------------------------------------------------------
+_SUPPORTED_MEDIA_TYPES = ("reel", "video")
+
+
+def _normalize_media_type(raw: Optional[str]) -> str:
+    """Normalize content.media_type to a canonical lowercase string.
+
+    Missing or empty maps to 'reel' to preserve legacy safe behavior —
+    all existing content rows without a media_type were queued as reels.
+    """
+    if not raw:
+        return "reel"
+    return raw.strip().lower()
+
+
 def process_item(supabase: Client, item: dict, content: dict) -> None:
     queue_id = item["id"]
     attempt_number = item["attempt_count"]  # already incremented by claim function
     max_attempts = item["max_attempts"]
     start_time = time.monotonic()
 
+    raw_media_type = content.get("media_type")
+    media_type = _normalize_media_type(raw_media_type)
+
     log.info(
         f"Processing queue item {queue_id} | "
         f"attempt={attempt_number}/{max_attempts} | "
-        f"dry_run={DRY_RUN}"
+        f"dry_run={DRY_RUN} | "
+        f"media_type={media_type!r}"
     )
 
     # Guard: never republish
@@ -479,9 +511,14 @@ def process_item(supabase: Client, item: dict, content: dict) -> None:
         return
 
     if DRY_RUN:
-        _process_dry_run(supabase, item, content, attempt_number, start_time)
+        _process_dry_run(supabase, item, content, attempt_number, start_time, media_type)
+    elif media_type not in _SUPPORTED_MEDIA_TYPES:
+        # carousel and any unrecognised type are blocked before any Meta API call
+        _handle_unsupported_media_type(
+            supabase, item, attempt_number, start_time, media_type, raw_media_type
+        )
     else:
-        _process_live(supabase, item, content, attempt_number, start_time)
+        _process_live(supabase, item, content, attempt_number, start_time, media_type)
 
 
 def _process_dry_run(
@@ -490,10 +527,14 @@ def _process_dry_run(
     content: dict,
     attempt_number: int,
     start_time: float,
+    media_type: str = "reel",
 ) -> None:
     queue_id = item["id"]
     safe_url = _redact_url(content["video_url"])
-    log.info(f"[DRY RUN] Would publish: '{content['title']}' | url={safe_url}")
+    log.info(
+        f"[DRY RUN] Would publish: '{content['title']}' | "
+        f"url={safe_url} | media_type={media_type!r}"
+    )
     log.info("[DRY RUN] Instagram API not called")
 
     duration_ms = int((time.monotonic() - start_time) * 1000)
@@ -503,7 +544,11 @@ def _process_dry_run(
         attempt_number=attempt_number,
         status="dry_run",
         duration_ms=duration_ms,
-        response_data={"dry_run": True, "content_id": content["id"]},
+        response_data={
+            "dry_run": True,
+            "content_id": content["id"],
+            "content_media_type": media_type,
+        },
     )
 
     # In dry-run: reset to scheduled so item remains in queue for real run
@@ -518,12 +563,67 @@ def _process_dry_run(
     log.info("[DRY RUN] Item reset to 'scheduled' — no state permanently changed")
 
 
+def _handle_unsupported_media_type(
+    supabase: Client,
+    item: dict,
+    attempt_number: int,
+    start_time: float,
+    media_type: str,
+    raw_media_type: Optional[str],
+) -> None:
+    """Terminal-fail a queue item whose media_type cannot be published yet.
+
+    No Meta API call is made. The queue item is marked permanently failed so it
+    is not retried. The GitHub Action exits cleanly (no sys.exit(1)) because
+    this is a business-logic block, not an infrastructure failure.
+    """
+    queue_id = item["id"]
+
+    if media_type == "carousel":
+        failure_msg = (
+            "Carousel publishing is not implemented yet; no Meta API call was made."
+        )
+        response_data: dict = {
+            "error_type": "unsupported_media_type",
+            "unsupported_media_type": "carousel",
+            "meta_api_called": False,
+            "blocked_before_meta": True,
+        }
+    else:
+        failure_msg = (
+            f"Unsupported media_type {media_type!r}; no Meta API call was made."
+        )
+        response_data = {
+            "error_type": "unsupported_media_type",
+            "unsupported_media_type": media_type,
+            "raw_media_type": raw_media_type,
+            "meta_api_called": False,
+            "blocked_before_meta": True,
+        }
+
+    log.error(f"[BLOCKED_BEFORE_META] {failure_msg} queue_id={queue_id}")
+
+    duration_ms = int((time.monotonic() - start_time) * 1000)
+    write_attempt(
+        supabase,
+        queue_id=queue_id,
+        attempt_number=attempt_number,
+        status="failed",
+        duration_ms=duration_ms,
+        error_message=failure_msg,
+        response_data=response_data,
+    )
+    terminal_fail_queue_item(supabase, queue_id=queue_id, failure_reason=failure_msg)
+    log.info(f"Queue item {queue_id} marked terminal failed — no retry scheduled")
+
+
 def _process_live(
     supabase: Client,
     item: dict,
     content: dict,
     attempt_number: int,
     start_time: float,
+    media_type: str = "reel",
 ) -> None:
     queue_id = item["id"]
     max_attempts = item["max_attempts"]
@@ -531,6 +631,12 @@ def _process_live(
     # Env vars are validated in main() before claiming, but read here for use.
     ig_user_id = os.environ.get("IG_USER_ID", "").strip()
     access_token = os.environ.get("IG_ACCESS_TOKEN", "").strip()
+
+    if media_type == "video":
+        log.info(
+            "media_type=video — using REELS Instagram path (compatibility mode); "
+            "Instagram payload media_type=REELS"
+        )
 
     caption = content.get("caption") or ""
     hashtags = content.get("hashtags") or []
@@ -602,6 +708,14 @@ def _process_live(
     # remaining DB state (published_at, queue_status) using the media_id in logs.
     duration_ms = int((time.monotonic() - start_time) * 1000)
     try:
+        success_response_data: dict = {"container_id": container_id, "media_id": media_id}
+        if media_type == "video":
+            success_response_data.update({
+                "content_media_type": "video",
+                "instagram_media_type": "REELS",
+                "media_type_note": "video_using_reels_path",
+                "compatibility_mode": True,
+            })
         write_attempt(
             supabase,
             queue_id=queue_id,
@@ -610,7 +724,7 @@ def _process_live(
             duration_ms=duration_ms,
             container_id=container_id,
             media_id=media_id,
-            response_data={"container_id": container_id, "media_id": media_id},
+            response_data=success_response_data,
         )
         mark_published(supabase, queue_id=queue_id, media_id=media_id)
         log.info(f"Published successfully: media_id={media_id}")
