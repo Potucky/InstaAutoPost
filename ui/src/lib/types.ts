@@ -74,7 +74,6 @@ export interface ScheduleSlot {
 export interface PublishAttempt {
   id: string;
   queue_id: string;
-  attempted_at: string;
   attempt_number: number;
   status: AttemptStatus;
   response_data: Record<string, unknown> | null;

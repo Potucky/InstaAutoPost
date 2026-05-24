@@ -16,10 +16,12 @@ export default function LogsAttempts() {
   const [attempts, setAttempts] = useState<PublishAttempt[]>([])
   const [filter, setFilter] = useState<AttemptStatus | 'all'>('all')
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState<string | null>(null)
 
   async function load() {
     setLoading(true)
+    setLoadError(null)
     let q = supabase
       .from('ig_publish_attempts')
       .select(`
@@ -29,10 +31,14 @@ export default function LogsAttempts() {
           ig_content_library(id, title)
         )
       `)
-      .order('attempted_at', { ascending: false })
+      .order('created_at', { ascending: false })
       .limit(100)
     if (filter !== 'all') q = q.eq('status', filter)
-    const { data } = await q
+    const { data, error } = await q
+    if (error) {
+      console.error('Failed to load publish attempts:', error.message)
+      setLoadError(error.message)
+    }
     setAttempts((data ?? []) as PublishAttempt[])
     setLoading(false)
   }
@@ -77,6 +83,13 @@ export default function LogsAttempts() {
             </button>
           ))}
         </div>
+
+        {loadError && (
+          <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+            <p className="font-medium">Unable to load publish attempts.</p>
+            <p className="mt-1 font-mono text-xs">{loadError}</p>
+          </div>
+        )}
 
         <div className="card overflow-hidden">
           {loading ? (
@@ -128,7 +141,7 @@ export default function LogsAttempts() {
                       </td>
                       <td className="table-td text-slate-500">{formatDuration(a.duration_ms)}</td>
                       <td className="table-td text-slate-500 text-xs">
-                        {format(new Date(a.attempted_at), 'MMM d, HH:mm:ss')}
+                        {format(new Date(a.created_at), 'MMM d, HH:mm:ss')}
                       </td>
                       <td className="table-td font-mono text-xs text-slate-500">
                         {a.media_id ?? '—'}
