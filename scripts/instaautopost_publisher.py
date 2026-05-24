@@ -481,12 +481,13 @@ _SUPPORTED_MEDIA_TYPES = ("reel", "video")
 def _normalize_media_type(raw: Optional[str]) -> str:
     """Normalize content.media_type to a canonical lowercase string.
 
-    Missing or empty maps to 'reel' to preserve legacy safe behavior —
+    None or whitespace-only maps to 'reel' to preserve legacy safe behavior —
     all existing content rows without a media_type were queued as reels.
     """
-    if not raw:
+    if raw is None:
         return "reel"
-    return raw.strip().lower()
+    normalized = str(raw).strip().lower()
+    return normalized or "reel"
 
 
 def process_item(supabase: Client, item: dict, content: dict) -> None:
@@ -675,6 +676,15 @@ def _process_live(
             if ig_detail_parts:
                 error_str = error_str + " | " + " | ".join(ig_detail_parts)
         log.error(f"Publish failed (pre-media_id): {error_str}")
+        fail_response_data: Optional[dict] = ig_error_data
+        if media_type == "video":
+            compat_meta = {
+                "content_media_type": "video",
+                "instagram_media_type": "REELS",
+                "media_type_note": "video_using_reels_path",
+                "compatibility_mode": True,
+            }
+            fail_response_data = {**(ig_error_data or {}), **compat_meta}
         write_attempt(
             supabase,
             queue_id=queue_id,
@@ -683,7 +693,7 @@ def _process_live(
             duration_ms=duration_ms,
             container_id=container_id,
             error_message=error_str,
-            response_data=ig_error_data,
+            response_data=fail_response_data,
         )
         mark_failed_or_retry(
             supabase,

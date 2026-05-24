@@ -73,6 +73,47 @@ write success attempt
 mark queue row published (final confirmation write)
 ```
 
+## Media Type Gate
+
+The worker evaluates `content.media_type` before making any Meta API call. The normalized value (stripped, lowercased, None or whitespace-only => `"reel"`) determines the publish path.
+
+| Normalized `media_type` | Live behavior | Meta API called? |
+| --- | --- | --- |
+| `reel` | REELS publish path | Yes |
+| `video` | REELS compatibility path (Instagram payload `media_type=REELS`) | Yes |
+| `carousel` | Terminal failed before Meta API | No |
+| Any other value | Terminal failed before Meta API | No |
+
+**Normalization rules:**
+
+- `None` or not set => `"reel"` (legacy safe default; existing rows without `media_type` were queued as reels)
+- Whitespace-only string => `"reel"`
+- Otherwise: `str(raw).strip().lower()`
+
+**Dry-run:** The media_type gate is not reached. Dry-run never calls Meta regardless of `media_type` and always resets the item to `scheduled`.
+
+**Unsupported types (carousel, unknown):**
+
+- Terminal fail with `queue_status = 'failed'` and no retry.
+- No Meta API call is made.
+- Attempt record is written with `meta_api_called: false` and `blocked_before_meta: true`.
+- This is a **business-logic block**, not an infrastructure failure. GitHub Actions should not go red unless the Supabase write itself fails. The worker exits cleanly (no `sys.exit(1)`) after recording the terminal failure.
+
+**video compatibility metadata:**
+
+When `media_type == "video"`, the attempt record's `response_data` includes compatibility fields on both success and failure:
+
+```json
+{
+  "content_media_type": "video",
+  "instagram_media_type": "REELS",
+  "media_type_note": "video_using_reels_path",
+  "compatibility_mode": true
+}
+```
+
+This is a temporary compatibility mode. The Instagram Graph API does not have a distinct `VIDEO` container type; video content is published via the REELS endpoint.
+
 ## Queue Claim Behavior
 
 The worker calls:
