@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Upload, Plus, Archive } from 'lucide-react'
 import { format } from 'date-fns'
-import { supabase } from '../lib/supabase'
+import { supabase, supabaseUrl, supabaseAnonKey } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
 import StatusPill from '../components/StatusPill'
 import type { ContentItem, ContentStatus } from '../lib/types'
@@ -159,18 +159,37 @@ export default function ContentLibrary() {
 
       // Trigger the publish workflow via the Edge Function.
       // The Edge Function holds the GitHub PAT — no secret is sent from the browser.
-      const { error: fnErr } = await supabase.functions.invoke('trigger-publish', {
-        body: { queue_id: inserted.id },
+      // Use direct fetch instead of supabase.functions.invoke so the JSON error body
+      // is readable on non-2xx (invoke swallows it into a generic message).
+      const { data: { session } } = await supabase.auth.getSession()
+      const triggerResp = await fetch(`${supabaseUrl}/functions/v1/trigger-publish`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': supabaseAnonKey,
+          'Authorization': `Bearer ${session?.access_token ?? ''}`,
+        },
+        body: JSON.stringify({ queue_id: inserted.id }),
       })
 
-      if (fnErr) {
+      if (!triggerResp.ok) {
         // Trigger failed — do NOT cancel the queue item. 'ready' items are picked up
         // by the scheduled worker (every 5 min) so the publish can still proceed.
         // Only an explicit user action may set queue_status to 'cancelled'.
-        // Record the failure cause in failure_reason for visibility in Logs & Attempts.
+        // Record the specific failure cause in failure_reason for Logs & Attempts.
+        let triggerReason = `Workflow trigger failed: trigger-publish returned ${triggerResp.status}`
+        try {
+          const respBody = await triggerResp.json() as { error?: string }
+          if (respBody?.error && typeof respBody.error === 'string') {
+            triggerReason = `Workflow trigger failed: ${respBody.error}`
+          }
+        } catch {
+          // keep status-code-only reason if body is not JSON
+        }
+
         await supabase
           .from('ig_publishing_queue')
-          .update({ failure_reason: `Workflow trigger failed: ${fnErr.message ?? 'Unknown error'}` })
+          .update({ failure_reason: triggerReason })
           .eq('id', inserted.id)
           .is('published_at', null)
           .is('external_media_id', null)

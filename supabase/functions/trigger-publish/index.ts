@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
     .maybeSingle();
 
   if (!adminRow) {
-    return jsonResponse({ error: "Forbidden — admin access required" }, 403);
+    return jsonResponse({ error: "Forbidden — admin access required", status: 403 }, 403);
   }
 
   // Validate queue row with service role (bypasses RLS)
@@ -151,7 +151,7 @@ Deno.serve(async (req: Request) => {
   const githubPat = Deno.env.get("GITHUB_PAT");
   if (!githubPat) {
     console.error("GITHUB_PAT secret is not configured");
-    return jsonResponse({ error: "Publish service is not configured" }, 500);
+    return jsonResponse({ error: "GITHUB_PAT secret is not configured", status: 500 }, 500);
   }
 
   const owner = Deno.env.get("GITHUB_OWNER") ?? "Potucky";
@@ -180,10 +180,12 @@ Deno.serve(async (req: Request) => {
     console.error(
       `GitHub workflow dispatch failed: HTTP ${ghResp.status} for queue_id=${queue_id}`,
     );
-    return jsonResponse(
-      { error: "Failed to trigger publish workflow — check configuration" },
-      502,
-    );
+    const ghMsg =
+      ghResp.status === 401 ? "GitHub dispatch returned 401: unauthorized" :
+      ghResp.status === 404 ? "GitHub dispatch returned 404: workflow not found" :
+      ghResp.status === 422 ? "GitHub dispatch returned 422: invalid inputs or ref" :
+      `GitHub dispatch returned ${ghResp.status}`;
+    return jsonResponse({ error: ghMsg, status: ghResp.status }, 502);
   }
 
   return jsonResponse({ ok: true, queue_id }, 200);
