@@ -164,33 +164,21 @@ export default function ContentLibrary() {
       })
 
       if (fnErr) {
-        // Workflow dispatch failed — attempt to cancel the inserted queue row so it
-        // does not become eligible for automatic processing. Guards prevent cancelling
-        // if the worker already claimed the row (published_at or external_media_id set).
-        const { data: reverted, error: revertErr } = await supabase
+        // Trigger failed — do NOT cancel the queue item. 'ready' items are picked up
+        // by the scheduled worker (every 5 min) so the publish can still proceed.
+        // Only an explicit user action may set queue_status to 'cancelled'.
+        // Record the failure cause in failure_reason for visibility in Logs & Attempts.
+        await supabase
           .from('ig_publishing_queue')
-          .update({ queue_status: 'cancelled' })
+          .update({ failure_reason: `Workflow trigger failed: ${fnErr.message ?? 'Unknown error'}` })
           .eq('id', inserted.id)
           .is('published_at', null)
           .is('external_media_id', null)
-          .in('queue_status', ['ready', 'scheduled'])
-          .select('id')
 
-        if (!revertErr && reverted && reverted.length > 0) {
-          alert(
-            'The publish workflow could not be triggered. The queue item has been cancelled.\n\n' +
-            'Investigate the edge function or GitHub Actions configuration, then try again.'
-          )
-        } else {
-          // Cancellation failed or affected zero rows — row may still be live-eligible.
-          alert(
-            'WARNING: The publish workflow could not be triggered and the queue row could not be cancelled.\n\n' +
-            'This queue item may still be live-eligible and could be picked up by the next worker run.\n\n' +
-            'Immediately open the Publishing Queue and manually cancel this item if it is still active.\n\n' +
-            `Queue item ID: ${inserted.id}` +
-            (revertErr ? `\nCancel error: ${revertErr.message}` : '')
-          )
-        }
+        alert(
+          'Publish workflow could not be triggered. The item was not cancelled.\n\n' +
+          'Check Logs & Attempts, then retry.'
+        )
       } else {
         alert('Publish workflow triggered! Check the Publishing Queue for live status.')
       }
