@@ -3,8 +3,12 @@ import { format } from 'date-fns'
 import { RefreshCw, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import StatusPill from '../components/StatusPill'
-import WorkflowDisabledBanner from '../components/WorkflowDisabledBanner'
 import type { QueueItem, QueueStatus } from '../lib/types'
+
+function fmtMins(totalMins: number): string {
+  if (totalMins < 60) return `${totalMins}m`
+  return `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`
+}
 
 const TABS: { label: string; value: QueueStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -128,8 +132,6 @@ export default function PublishingQueue() {
       </div>
 
       <div className="page-body space-y-4">
-        <WorkflowDisabledBanner />
-
         {/* Tabs */}
         <div className="flex flex-wrap gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {TABS.map(({ label, value }) => (
@@ -145,6 +147,11 @@ export default function PublishingQueue() {
             </button>
           ))}
         </div>
+
+        <p className="text-xs text-slate-400">
+          <span className="font-medium text-slate-500">Ready</span> = eligible for the next worker run after scheduled time.
+          GitHub scheduled workflows may run a few minutes after the cron tick — publishing delay is normal.
+        </p>
 
         <div className="card overflow-hidden">
           {loading ? (
@@ -185,9 +192,19 @@ export default function PublishingQueue() {
                       <td className="table-td"><StatusPill status={item.queue_status} /></td>
                       <td className="table-td text-slate-500 text-xs">
                         {item.scheduled_at ? format(new Date(item.scheduled_at), 'MMM d, HH:mm') : '—'}
+                        {item.queue_status === 'ready' && item.scheduled_at && (() => {
+                          const mins = Math.round((Date.now() - new Date(item.scheduled_at).getTime()) / 60000)
+                          if (mins > 0) return <div className="text-amber-500 font-medium mt-0.5">Overdue +{fmtMins(mins)}</div>
+                          return <div className="text-blue-400 mt-0.5">Due in {fmtMins(-mins)}</div>
+                        })()}
                       </td>
                       <td className="table-td text-slate-500 text-xs">
                         {item.published_at ? format(new Date(item.published_at), 'MMM d, HH:mm') : '—'}
+                        {item.published_at && item.scheduled_at && (() => {
+                          const mins = Math.round((new Date(item.published_at).getTime() - new Date(item.scheduled_at).getTime()) / 60000)
+                          if (mins > 0) return <div className="text-slate-400 mt-0.5">+{fmtMins(mins)} delay</div>
+                          return null
+                        })()}
                       </td>
                       <td className="table-td">
                         <span className={item.attempt_count >= item.max_attempts ? 'text-red-500 font-medium' : 'text-slate-500'}>

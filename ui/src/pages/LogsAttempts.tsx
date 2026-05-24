@@ -5,6 +5,11 @@ import { supabase } from '../lib/supabase'
 import StatusPill from '../components/StatusPill'
 import type { PublishAttempt, AttemptStatus } from '../lib/types'
 
+function fmtMins(totalMins: number): string {
+  if (totalMins < 60) return `${totalMins}m`
+  return `${Math.floor(totalMins / 60)}h ${totalMins % 60}m`
+}
+
 const TABS: { label: string; value: AttemptStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
   { label: 'Success', value: 'success' },
@@ -27,7 +32,7 @@ export default function LogsAttempts() {
       .select(`
         *,
         ig_publishing_queue(
-          id, content_id, queue_status,
+          id, content_id, queue_status, scheduled_at,
           ig_content_library(id, title)
         )
       `)
@@ -159,6 +164,16 @@ export default function LogsAttempts() {
                               <p className="text-slate-500 font-medium mb-1">Worker Version</p>
                               <p className="font-mono text-slate-700">{a.worker_version ?? '—'}</p>
                             </div>
+                            {a.ig_publishing_queue?.scheduled_at && (() => {
+                              const mins = Math.round((new Date(a.created_at).getTime() - new Date(a.ig_publishing_queue!.scheduled_at!).getTime()) / 60000)
+                              if (mins <= 0) return null
+                              return (
+                                <div>
+                                  <p className="text-slate-500 font-medium mb-1">Schedule Delay</p>
+                                  <p className="font-mono text-slate-700">+{fmtMins(mins)} from scheduled time</p>
+                                </div>
+                              )
+                            })()}
                             {a.error_message && (
                               <div className="col-span-2">
                                 <p className="text-red-500 font-medium mb-1">Error</p>

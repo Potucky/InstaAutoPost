@@ -87,5 +87,5 @@ export interface PublishAttempt {
   dry_run: boolean;
   worker_version: string | null;
   created_at: string;
-  ig_publishing_queue?: Pick<QueueItem, 'id' | 'content_id' | 'queue_status' | 'ig_content_library'>;
+  ig_publishing_queue?: Pick<QueueItem, 'id' | 'content_id' | 'queue_status' | 'scheduled_at' | 'ig_content_library'>;
 }

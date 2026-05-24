@@ -4,7 +4,6 @@ import { LayoutGrid, Clock, CheckCircle, AlertCircle, ArrowRight, CalendarCheck 
 import { format, startOfDay } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import StatusPill from '../components/StatusPill'
-import WorkflowDisabledBanner from '../components/WorkflowDisabledBanner'
 import type { QueueItem } from '../lib/types'
 
 interface Stats {
@@ -79,8 +78,6 @@ export default function Dashboard() {
       </div>
 
       <div className="page-body space-y-8">
-        <WorkflowDisabledBanner />
-
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, bg }) => (
