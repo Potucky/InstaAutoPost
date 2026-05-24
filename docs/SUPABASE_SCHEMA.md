@@ -371,9 +371,10 @@ Before first real publish:
 - [ ] Confirm `trg_sync_slot_with_queue_lifecycle` trigger exists on `ig_publishing_queue`.
 - [ ] Confirm `derive_slot_status_from_queue()` and `sync_slot_with_queue_lifecycle()` functions exist.
 - [ ] Confirm publisher workflow concurrency is configured (`group: instaautopost-publisher`, `cancel-in-progress: false`) in `.github/workflows/instaautopost-publisher.yml`.
-- [ ] Create GitHub Environment `instagram-live` in Settings > Environments with at least one required reviewer. Live workflow runs reference this environment; dry-run jobs bypass it.
-- [ ] Confirm dry-run (`live_mode=false`) completes without triggering the `instagram-live` environment gate.
-- [ ] Confirm live confirmation guard: a run with `live_mode=true` but missing or wrong `live_confirmation` exits 1 before claiming any queue row.
+- [ ] Confirm single `publish` job is present in the workflow (no `publish_dry_run` / `publish_live` split).
+- [ ] Confirm workflow sets `INSTAGRAM_API_ENABLED=true` for production runs; no `live_mode` or `live_confirmation` inputs exist.
+- [ ] Confirm optional `queue_id` is the only `workflow_dispatch` input.
+- [ ] Confirm safety relies on queue eligibility checks, concurrency group, one item per run, duplicate publish protection (`external_media_id` anchor), and required GitHub secrets — not an environment gate.
 
 ## Manual Script Safety Note
 

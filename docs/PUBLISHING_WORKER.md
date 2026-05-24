@@ -215,12 +215,11 @@ Workflow:
 
 Current state:
 
-- Manual `workflow_dispatch` is available.
-- Automatic schedule is commented out.
+- Manual `workflow_dispatch` is available (optional `queue_id` input only).
+- Automatic schedule runs every 5 minutes.
+- Single `publish` job — always live (`INSTAGRAM_API_ENABLED=true`). No `instagram-live` environment gate.
 - Workflow installs Python dependencies from `scripts/requirements.txt`.
 - Workflow runs `python scripts/instaautopost_publisher.py`.
-
-Do not re-enable automatic schedule until the user asks and safety blockers are addressed.
 
 ## First Real Publish Checklist
 
@@ -234,5 +233,5 @@ Do not re-enable automatic schedule until the user asks and safety blockers are 
 - [x] Migration 20260516002000 exists in repo and applied during dev/local verification.
 - [ ] Migration 20260516002000 confirmed applied in production Supabase instance.
 - [ ] Dry-run succeeds on the intended queue row.
-- [ ] Workflow schedule state is intentional (automatic cron is currently disabled).
+- [x] Workflow schedule state is intentional (automatic cron runs every 5 minutes).
 - [ ] User explicitly confirms live publishing.

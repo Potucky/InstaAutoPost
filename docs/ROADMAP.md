@@ -10,7 +10,7 @@ Implemented:
 - Dry-run default controlled by `INSTAGRAM_API_ENABLED`.
 - Instagram Graph API live path in worker.
 - GitHub Actions workflow for manual worker execution.
-- Automatic workflow schedule is currently disabled to stop failure email spam.
+- Automatic workflow schedule runs every 5 minutes.
 
 Partially implemented:
 
@@ -28,16 +28,16 @@ Implemented (Task 4.1 + 4.2):
 Implemented (Task 8):
 
 - Publisher workflow concurrency: `group: instaautopost-publisher`, `cancel-in-progress: false`. Overlapping runs are prevented; one pending run may wait.
-- Live mode requires explicit `live_confirmation` input equal to `PUBLISH LIVE`. No fallback to `vars.INSTAGRAM_API_ENABLED` — dry-run is unconditionally the default when `live_mode` is false.
-- Script live guard: worker checks `INSTAAUTOPOST_LIVE_CONFIRMATION == 'PUBLISH LIVE'` before any Supabase claim. Missing or wrong value → log error and exit 1.
-- Workflow split into two jobs: `publish_dry_run` (no environment, runs when `live_mode != true`) and `publish_live` (`environment: instagram-live`, runs when `live_mode == true`). Dry-run bypasses the environment gate entirely. The `instagram-live` environment must be created in Settings > Environments with at least one required reviewer before live publishing begins.
 
-Implemented (Publish Now live confirmation fix):
+Implemented (Publisher simplification):
 
-- UI "Publish Now" confirmation modal now requires typing `PUBLISH LIVE` exactly before the button enables.
-- Edge function (`trigger-publish`) validates `live_confirmation === "PUBLISH LIVE"` server-side and rejects requests that omit or misspell it (HTTP 400) — before dispatching GitHub Actions.
-- Edge function now passes `live_confirmation` through to the GitHub Actions dispatch inputs so the Python worker's existing phrase check receives the value and can pass.
-- Before this fix: `trigger-publish` dispatched `live_mode=true` with no `live_confirmation`, causing the Python worker to exit before claiming (safe but misleading). After this fix: all three guards (UI, edge function, Python worker) require the same phrase and fail together if it is wrong.
+- Removed two-job workflow split (`publish_dry_run` / `publish_live`) — replaced with a single `publish` job that always runs live (`INSTAGRAM_API_ENABLED=true`).
+- Removed `live_mode` and `live_confirmation` workflow inputs. Only `queue_id` remains as an optional dispatch input.
+- Removed `INSTAAUTOPOST_LIVE_CONFIRMATION` env var and the corresponding script guard.
+- Removed `instagram-live` environment gate requirement from the production workflow.
+- Edge function (`trigger-publish`) no longer requires or forwards `live_confirmation` — dispatches only `queue_id`.
+- UI "Publish Now" modal no longer references `PUBLISH LIVE`. Checkbox confirmation UX is kept.
+- Dry-run support is preserved for local/developer use via `INSTAGRAM_API_ENABLED=false` when running the script directly.
 
 Implemented (Task 9):
 
@@ -56,7 +56,6 @@ Implemented (Task 10):
 Blocked:
 
 - First real Instagram publish.
-- Production automation.
 - Broad feature expansion.
 
 ## Active Safety Blockers
@@ -72,12 +71,8 @@ Fixed (worker v1.2.0 + migration 20260516002000):
 Remaining before first real publish:
 
 - Confirm migration 20260516002000 is applied to production Supabase (applied in dev/local verification).
-- Run a dry-run against a known safe queue row and verify the attempt log.
+- Run a manual workflow dispatch against a known safe queue item and verify the attempt log.
 - Confirm `claim_next_queue_item` executes cleanly under the service role.
-- Create GitHub Environment `instagram-live` in Settings > Environments with at least one required reviewer.
-- Confirm dry-run completes without triggering the `instagram-live` environment gate.
-- Confirm live confirmation guard rejects a run that omits or misspells the phrase.
-- Get explicit user confirmation for the live publish (pass `live_confirmation=PUBLISH LIVE` via workflow_dispatch).
 
 Known edge case (not blocking dry-run):
 
@@ -86,9 +81,8 @@ Known edge case (not blocking dry-run):
 ## Immediate Next Steps
 
 1. Confirm migration 20260516002000 is applied to production Supabase.
-2. Run dry-run manually against a known safe queue item.
-3. Review database state after dry-run (attempt log written, row reset to `scheduled`).
-4. Only then request explicit confirmation for a live publish.
+2. Run a manual workflow dispatch against a known safe queue item.
+3. Verify the attempt log and queue state after the run.
 
 ## MVP Milestones
 
@@ -112,7 +106,7 @@ Known edge case (not blocking dry-run):
 
 - User confirms live run.
 - One queue item is selected and verified.
-- Live mode is enabled only for the run.
+- Production workflow sets `INSTAGRAM_API_ENABLED=true`; safety comes from queue eligibility, concurrency controls, and duplicate publish protection.
 - Published proof is stored.
 - Attempt log is written.
 - No retry is scheduled after success.
@@ -126,7 +120,7 @@ Known edge case (not blocking dry-run):
 
 ## Post-MVP Milestones
 
-- Re-enable scheduled publishing with a deliberate cron.
+- Confirm scheduled publishing cron cadence is appropriate for production load.
 - Add account connection status screen.
 - Add safety center screen.
 - Add media upload to Supabase Storage.
@@ -161,5 +155,5 @@ Known edge case (not blocking dry-run):
 - Broad multi-platform abstractions.
 - AI content factory features before safe publishing works.
 - Complex campaign management.
-- Production cron automation before worker blockers are fixed.
+- Expanding cron automation scope before the first real publish is verified.
 - UI controls that imply live publishing is safe before it is.
