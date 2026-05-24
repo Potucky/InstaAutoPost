@@ -3,6 +3,7 @@ import { format } from 'date-fns'
 import { RefreshCw, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import StatusPill from '../components/StatusPill'
+import WorkflowDisabledBanner from '../components/WorkflowDisabledBanner'
 import type { QueueItem, QueueStatus } from '../lib/types'
 
 const TABS: { label: string; value: QueueStatus | 'all' }[] = [
@@ -115,7 +116,7 @@ export default function PublishingQueue() {
   const actionable = (s: QueueStatus) => ['draft', 'scheduled', 'ready', 'retry_scheduled', 'failed'].includes(s)
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Publishing Queue</h1>
@@ -127,6 +128,8 @@ export default function PublishingQueue() {
       </div>
 
       <div className="page-body space-y-4">
+        <WorkflowDisabledBanner />
+
         {/* Tabs */}
         <div className="flex flex-wrap gap-1 bg-white border border-gray-200 rounded-lg p-1 w-fit">
           {TABS.map(({ label, value }) => (
@@ -151,6 +154,7 @@ export default function PublishingQueue() {
               <p className="text-sm">No items in this view.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
@@ -197,7 +201,7 @@ export default function PublishingQueue() {
                           const hasProof = !!(item.external_media_id || item.published_at)
                           if (hasProof && item.queue_status === 'failed') {
                             return (
-                              <span className="text-xs text-amber-700 font-medium" title={`external_media_id: ${item.external_media_id ?? 'n/a'}`}>
+                              <span className="text-xs text-amber-700 font-medium truncate block max-w-[200px]" title={`external_media_id: ${item.external_media_id ?? 'n/a'}`}>
                                 Published proof exists — manual reconciliation only
                               </span>
                             )
@@ -273,6 +277,7 @@ export default function PublishingQueue() {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

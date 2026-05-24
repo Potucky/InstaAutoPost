@@ -4,6 +4,7 @@ import { Video, Clock, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react
 import { format, startOfDay } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import StatusPill from '../components/StatusPill'
+import WorkflowDisabledBanner from '../components/WorkflowDisabledBanner'
 import type { QueueItem } from '../lib/types'
 
 interface Stats {
@@ -16,13 +17,14 @@ interface Stats {
 export default function Dashboard() {
   const [stats, setStats] = useState<Stats>({ totalContent: 0, scheduled: 0, publishedToday: 0, failed: 0 })
   const [recent, setRecent] = useState<QueueItem[]>([])
+  const [nextItem, setNextItem] = useState<QueueItem | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     async function load() {
       const todayStart = startOfDay(new Date()).toISOString()
 
-      const [totalRes, scheduledRes, publishedRes, failedRes, recentRes] = await Promise.all([
+      const [totalRes, scheduledRes, publishedRes, failedRes, recentRes, nextRes] = await Promise.all([
         supabase.from('ig_content_library').select('*', { count: 'exact', head: true }),
         supabase.from('ig_publishing_queue').select('*', { count: 'exact', head: true })
           .in('queue_status', ['scheduled', 'ready', 'retry_scheduled']),
@@ -34,6 +36,13 @@ export default function Dashboard() {
           .select('*, ig_content_library(id, title, video_url, content_status)')
           .order('updated_at', { ascending: false })
           .limit(8),
+        supabase.from('ig_publishing_queue')
+          .select('*, ig_content_library(id, title, video_url, content_status)')
+          .in('queue_status', ['scheduled', 'ready'])
+          .is('published_at', null)
+          .is('external_media_id', null)
+          .order('scheduled_at', { ascending: true })
+          .limit(1),
       ])
 
       setStats({
@@ -43,6 +52,7 @@ export default function Dashboard() {
         failed: failedRes.count ?? 0,
       })
       setRecent((recentRes.data ?? []) as QueueItem[])
+      setNextItem(((nextRes.data ?? []) as QueueItem[])[0] ?? null)
       setLoading(false)
     }
     load()
@@ -63,6 +73,8 @@ export default function Dashboard() {
       </div>
 
       <div className="page-body space-y-8">
+        <WorkflowDisabledBanner />
+
         {/* Stats */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, bg }) => (
@@ -76,6 +88,29 @@ export default function Dashboard() {
               </div>
             </div>
           ))}
+        </div>
+
+        {/* Next to publish */}
+        <div className="card px-5 py-4">
+          <h2 className="text-sm font-semibold text-slate-900 mb-3">Next to Publish</h2>
+          {loading || nextItem === undefined ? (
+            <p className="text-sm text-slate-400">Loading...</p>
+          ) : nextItem === null ? (
+            <p className="text-sm text-slate-500">No items scheduled or ready.</p>
+          ) : (
+            <div className="flex flex-wrap items-center gap-4">
+              <span className="font-medium text-slate-900 truncate max-w-[240px]">
+                {nextItem.ig_content_library?.title ?? nextItem.content_id.slice(0, 8)}
+              </span>
+              <StatusPill status={nextItem.queue_status} />
+              <span className="text-xs text-slate-500">
+                {nextItem.scheduled_at ? format(new Date(nextItem.scheduled_at), 'MMM d, HH:mm') : 'No time set'}
+              </span>
+              <span className="text-xs text-slate-400">
+                Attempt {nextItem.attempt_count}/{nextItem.max_attempts}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Recent Queue */}

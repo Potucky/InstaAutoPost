@@ -212,7 +212,7 @@ export default function CalendarPage() {
 
           <div className="grid grid-cols-7 gap-1">
             {paddingDays.map((_, i) => (
-              <div key={`pad-${i}`} className="h-20 rounded-lg" />
+              <div key={`pad-${i}`} className="h-28 rounded-lg" />
             ))}
             {days.map((day) => {
               const daySlots = slotsForDay(day)
@@ -223,7 +223,7 @@ export default function CalendarPage() {
                   type="button"
                   onClick={() => setSelected(isSameDay(day, selected ?? new Date(0)) ? null : day)}
                   className={[
-                    'h-20 rounded-lg p-1.5 text-left transition-colors border',
+                    'h-28 rounded-lg p-1.5 text-left transition-colors border',
                     isToday(day) ? 'border-violet-300 bg-violet-50' : 'border-transparent hover:border-gray-200 hover:bg-gray-50',
                     isSelected ? 'border-violet-500 bg-violet-50 ring-1 ring-violet-300' : '',
                   ].join(' ')}
@@ -235,7 +235,7 @@ export default function CalendarPage() {
                     {format(day, 'd')}
                   </span>
                   <div className="space-y-0.5">
-                    {daySlots.slice(0, 2).map((slot) => (
+                    {daySlots.slice(0, 3).map((slot) => (
                       <div
                         key={slot.id}
                         className={`text-[10px] rounded px-1 py-0.5 truncate font-medium ${BADGE_STYLES[slot.slot_status] ?? 'bg-gray-100 text-gray-500'}`}
@@ -243,8 +243,8 @@ export default function CalendarPage() {
                         {slot.ig_content_library?.title ?? slot.slot_window}
                       </div>
                     ))}
-                    {daySlots.length > 2 && (
-                      <p className="text-[10px] text-slate-400">+{daySlots.length - 2} more</p>
+                    {daySlots.length > 3 && (
+                      <p className="text-[10px] text-slate-400">+{daySlots.length - 3} more</p>
                     )}
                   </div>
                 </button>

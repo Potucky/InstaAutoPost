@@ -220,7 +220,7 @@ export default function ContentLibrary() {
   }
 
   return (
-    <div>
+    <div className="min-w-0">
       <div className="page-header flex items-center justify-between">
         <div>
           <h1 className="page-title">Content Library</h1>
@@ -316,13 +316,13 @@ export default function ContentLibrary() {
                         ? <StatusPill status={slot.queue_status} />
                         : <span className="text-slate-400 text-xs">Not queued</span>}
                     </td>
-                    <td className="table-td py-2">
-                      <div className="flex items-center gap-2">
+                    <td className="table-td py-2 w-px">
+                      <div className="flex flex-col items-start gap-0.5">
                         {item.content_status === 'draft' && (
                           <button
                             type="button"
                             onClick={() => handleApprove(item.id)}
-                            className="text-xs text-emerald-600 hover:text-emerald-700 font-medium"
+                            className="text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap"
                           >
                             Approve
                           </button>
@@ -333,14 +333,14 @@ export default function ContentLibrary() {
                               type="button"
                               onClick={() => setPublishConfirmItem(item)}
                               disabled={publishingNow === item.id}
-                              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium disabled:opacity-40"
+                              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap disabled:opacity-40"
                             >
                               {publishingNow === item.id ? '…' : 'Publish Now'}
                             </button>
                             <button
                               type="button"
                               onClick={() => handleAddToQueue(item)}
-                              className="text-xs text-violet-600 hover:text-violet-700 font-medium"
+                              className="text-xs text-violet-600 hover:text-violet-700 font-medium whitespace-nowrap"
                             >
                               + Queue
                             </button>
