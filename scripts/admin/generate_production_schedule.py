@@ -16,7 +16,6 @@ Does NOT:
 
 import argparse
 import hashlib
-import itertools
 import random
 import sys
 from datetime import date, datetime, timedelta
@@ -51,21 +50,23 @@ def parse_date(s: str) -> date:
 # Content-type rotation
 # ---------------------------------------------------------------------------
 
-def build_type_rotation(seed: int) -> list[list[str]]:
+def build_type_rotation(seed: int) -> list[str]:
     """
-    Return a shuffled list of all 6 permutations of CONTENT_TYPES.
+    Return the base content-type order for a 3-day rotation cycle.
 
-    Cycling through this list guarantees:
-    - Every day's windows are each assigned a distinct content type.
-    - No two consecutive days (including across the 6-day cycle boundary)
-      share the same per-window ordering, because all 6 permutations are
-      distinct and the cycle never places the same permutation adjacent to
-      itself.
+    Day d (0-based from schedule start) is assigned:
+      morning  → base[(d + 0) % 3]
+      lunch    → base[(d + 1) % 3]
+      evening  → base[(d + 2) % 3]
+
+    Because each step advances every window's type by one index in the base
+    array, no window can ever repeat the same type on consecutive days, and
+    no two consecutive days share the same full daily ordering.
     """
-    perms = [list(p) for p in itertools.permutations(CONTENT_TYPES)]
+    types = list(CONTENT_TYPES)
     rng = random.Random(seed)
-    rng.shuffle(perms)
-    return perms
+    rng.shuffle(types)
+    return types
 
 
 # ---------------------------------------------------------------------------
@@ -100,21 +101,22 @@ def generate_schedule(
     Uniqueness: global HH:MM:SS uniqueness enforced across the full schedule.
     Each (date, window) retries up to 3 600 times to find a unique second.
 
-    Content-type rotation: cycles through all 6 permutations of CONTENT_TYPES
-    one permutation per day. The windows for that day are assigned the
-    types in permutation order (morning → [0], lunch → [1], evening → [2]).
-    No two consecutive days share the same daily ordering.
+    Content-type rotation: cycles through a 3-day rotation of CONTENT_TYPES.
+    Day d (0-based from start) assigns morning → base[(d+0)%3],
+    lunch → base[(d+1)%3], evening → base[(d+2)%3].
+    Each step shifts every window's type, so no window repeats on consecutive
+    days and no two consecutive days share the same full daily ordering.
     """
     window_names = list(WINDOWS.keys())
-    type_rotation = build_type_rotation(seed)
-    rotation_cycle = itertools.cycle(type_rotation)
+    base_types = build_type_rotation(seed)
 
     used_times: set[tuple[int, int, int]] = set()
     slots: list[dict] = []
 
     current = start
+    day_index = 0
     while current < end:
-        day_types = next(rotation_cycle)
+        day_types = [base_types[(day_index + j) % 3] for j in range(len(window_names))]
 
         for i, window_name in enumerate(window_names):
             w_start, w_end = WINDOWS[window_name]
@@ -153,6 +155,7 @@ def generate_schedule(
                 }
             )
 
+        day_index += 1
         current += timedelta(days=1)
 
     return slots
