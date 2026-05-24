@@ -30,6 +30,7 @@ pnpm-debug.log*
 
 # Supabase local
 .supabase/
+supabase/.temp/
 
 # Claude local settings
 .claude/
