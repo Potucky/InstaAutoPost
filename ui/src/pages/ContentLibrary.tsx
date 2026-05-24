@@ -328,23 +328,32 @@ export default function ContentLibrary() {
                           </button>
                         )}
                         {item.content_status === 'approved' && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => setPublishConfirmItem(item)}
-                              disabled={publishingNow === item.id}
-                              className="text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap disabled:opacity-40"
+                          item.media_type === 'carousel' ? (
+                            <span
+                              className="text-xs text-slate-400 italic whitespace-nowrap"
+                              title="Carousel publishing is not implemented yet."
                             >
-                              {publishingNow === item.id ? '…' : 'Publish Now'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleAddToQueue(item)}
-                              className="text-xs text-violet-600 hover:text-violet-700 font-medium whitespace-nowrap"
-                            >
-                              + Queue
-                            </button>
-                          </>
+                              Carousel publishing planned
+                            </span>
+                          ) : (
+                            <>
+                              <button
+                                type="button"
+                                onClick={() => setPublishConfirmItem(item)}
+                                disabled={publishingNow === item.id}
+                                className="text-xs text-emerald-600 hover:text-emerald-700 font-medium whitespace-nowrap disabled:opacity-40"
+                              >
+                                {publishingNow === item.id ? '…' : 'Publish Now'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleAddToQueue(item)}
+                                className="text-xs text-violet-600 hover:text-violet-700 font-medium whitespace-nowrap"
+                              >
+                                + Queue
+                              </button>
+                            </>
+                          )
                         )}
                         {item.content_status !== 'archived' && (
                           <button
