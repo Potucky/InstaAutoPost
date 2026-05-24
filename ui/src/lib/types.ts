@@ -1,5 +1,7 @@
 export type ContentStatus = 'draft' | 'approved' | 'archived';
 
+export type MediaType = 'reel' | 'video' | 'carousel';
+
 export type QueueStatus =
   | 'draft'
   | 'scheduled'
@@ -20,7 +22,7 @@ export interface ContentItem {
   thumbnail_url: string | null;
   hashtags: string[] | null;
   content_status: ContentStatus;
-  media_type: string;
+  media_type: MediaType;
   duration_seconds: number | null;
   file_size: number | null;
   created_by: string | null;

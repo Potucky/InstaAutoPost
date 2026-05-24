@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Video, CheckCircle, Upload, Loader2, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth'
+import type { MediaType } from '../lib/types'
 
 const STORAGE_BUCKET = 'instaautopost-media'
 const MAX_VIDEO_UPLOAD_BYTES = 45 * 1024 * 1024
@@ -14,7 +15,7 @@ interface FormData {
   thumbnail_url: string
   hashtag_input: string
   duration_seconds: string
-  media_type: string
+  media_type: MediaType
 }
 
 const DEFAULTS: FormData = {
@@ -24,7 +25,7 @@ const DEFAULTS: FormData = {
   thumbnail_url: '',
   hashtag_input: '',
   duration_seconds: '',
-  media_type: 'video',
+  media_type: 'reel',
 }
 
 function sanitizeFilename(name: string): string {
@@ -270,6 +271,23 @@ export default function UploadVideo() {
                 onChange={(e) => set('title', e.target.value)}
                 required
               />
+            </div>
+
+            <div>
+              <label className="label" htmlFor="media_type">Media Type</label>
+              <select
+                id="media_type"
+                className="input"
+                value={form.media_type}
+                onChange={(e) => set('media_type', e.target.value as MediaType)}
+              >
+                <option value="reel">reel — Instagram Reel</option>
+                <option value="video">video — Video post</option>
+                <option value="carousel">carousel — Carousel / photo post</option>
+              </select>
+              <p className="text-xs text-slate-400 mt-1">
+                Current publisher supports Reels/video uploads first. Carousel support is planned and may require a separate publishing path.
+              </p>
             </div>
 
             {/* File Upload */}
