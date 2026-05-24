@@ -328,7 +328,7 @@ export default function ContentLibrary() {
                           </button>
                         )}
                         {item.content_status === 'approved' && (
-                          item.media_type === 'carousel' ? (
+                          String(item.media_type ?? '').trim().toLowerCase() === 'carousel' ? (
                             <span
                               className="text-xs text-slate-400 italic whitespace-nowrap"
                               title="Carousel publishing is not implemented yet."
