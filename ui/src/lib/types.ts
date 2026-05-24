@@ -70,6 +70,7 @@ export interface ScheduleSlot {
     id: string;
     title: string;
     media_type: string;
+    caption?: string | null;
   } | null;
 }
 

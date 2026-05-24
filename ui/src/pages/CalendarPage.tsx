@@ -80,7 +80,7 @@ export default function CalendarPage() {
   const [error, setError] = useState<string | null>(null)
   const [selected, setSelected] = useState<Date | null>(null)
 
-  // Summary counts + next 50 upcoming slots — runs once on mount
+  // Summary counts + next 200 upcoming slots — runs once on mount
   useEffect(() => {
     async function loadInitial() {
       setLoading(true)
@@ -110,10 +110,10 @@ export default function CalendarPage() {
 
       const { data: upcoming, error: upcomingErr } = await supabase
         .from('ig_schedule_slots')
-        .select('*, ig_content_library(id, title, media_type)')
+        .select('*, ig_content_library(id, title, media_type, caption)')
         .gte('scheduled_at', new Date().toISOString())
         .order('scheduled_at', { ascending: true })
-        .limit(50)
+        .limit(200)
 
       if (upcomingErr) {
         setError(upcomingErr.message)
@@ -134,7 +134,7 @@ export default function CalendarPage() {
       const monthEndKey = format(endOfMonth(current), 'yyyy-MM-dd')
       const { data, error: monthErr } = await supabase
         .from('ig_schedule_slots')
-        .select('*, ig_content_library(id, title, media_type)')
+        .select('*, ig_content_library(id, title, media_type, caption)')
         .gte('slot_date', monthStartKey)
         .lte('slot_date', monthEndKey)
         .order('slot_date', { ascending: true })
@@ -270,8 +270,13 @@ export default function CalendarPage() {
                       <p className="text-sm font-medium text-slate-900 truncate">
                         {slot.ig_content_library?.title ?? 'Empty'}
                       </p>
+                      {slot.ig_content_library?.caption && (
+                        <p className="text-xs text-slate-400 line-clamp-2 leading-tight mt-0.5">
+                          {slot.ig_content_library.caption}
+                        </p>
+                      )}
                       {slot.ig_content_library?.media_type && (
-                        <p className="text-xs text-slate-400">{slot.ig_content_library.media_type}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{slot.ig_content_library.media_type}</p>
                       )}
                     </div>
                     <SlotBadge status={slot.slot_status} />
@@ -284,7 +289,7 @@ export default function CalendarPage() {
 
         {/* Upcoming slots table */}
         <div className="card p-5">
-          <h2 className="text-base font-semibold text-slate-900 mb-4">Upcoming Slots (next 50)</h2>
+          <h2 className="text-base font-semibold text-slate-900 mb-4">Upcoming Slots (next 200)</h2>
 
           {loading && (
             <div className="flex items-center justify-center gap-2 text-slate-400 py-10">
@@ -323,8 +328,15 @@ export default function CalendarPage() {
                       <td className="py-2.5 pr-4 text-xs text-slate-600 capitalize">{slot.slot_window}</td>
                       <td className="py-2.5 pr-4 font-mono text-xs text-slate-600 whitespace-nowrap">{formatNY(slot.scheduled_at)}</td>
                       <td className="py-2.5 pr-4"><SlotBadge status={slot.slot_status} /></td>
-                      <td className="py-2.5 pr-4 text-xs text-slate-700 max-w-xs truncate">
-                        {slot.ig_content_library?.title ?? <span className="text-slate-400 italic">Empty</span>}
+                      <td className="py-2.5 pr-4 max-w-xs">
+                        <p className="text-xs text-slate-700 truncate">
+                          {slot.ig_content_library?.title ?? <span className="text-slate-400 italic">Empty</span>}
+                        </p>
+                        {slot.ig_content_library?.caption && (
+                          <p className="text-xs text-slate-400 line-clamp-2 leading-tight mt-0.5">
+                            {slot.ig_content_library.caption}
+                          </p>
+                        )}
                       </td>
                       <td className="py-2.5 text-xs text-slate-500">{slot.ig_content_library?.media_type ?? '—'}</td>
                     </tr>

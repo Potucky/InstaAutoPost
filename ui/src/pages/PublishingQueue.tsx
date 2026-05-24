@@ -26,7 +26,7 @@ export default function PublishingQueue() {
     setLoading(true)
     let q = supabase
       .from('ig_publishing_queue')
-      .select('*, ig_content_library(id, title, content_status)')
+      .select('*, ig_content_library(id, title, content_status, caption)')
       .order('scheduled_at', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: false })
     if (filter !== 'all') q = q.eq('queue_status', filter)
@@ -158,7 +158,7 @@ export default function PublishingQueue() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="table-th">Video</th>
+                  <th className="table-th">Content</th>
                   <th className="table-th">Status</th>
                   <th className="table-th">Scheduled At</th>
                   <th className="table-th">Published At</th>
@@ -175,6 +175,11 @@ export default function PublishingQueue() {
                         <p className="font-medium text-slate-900 max-w-[180px] truncate">
                           {item.ig_content_library?.title ?? item.content_id.slice(0, 8)}
                         </p>
+                        {item.ig_content_library?.caption && (
+                          <p className="text-xs text-slate-400 max-w-[180px] line-clamp-2 leading-tight mt-0.5">
+                            {item.ig_content_library.caption}
+                          </p>
+                        )}
                         <p className="text-xs text-slate-400 font-mono">{item.id.slice(0, 8)}</p>
                       </td>
                       <td className="table-td"><StatusPill status={item.queue_status} /></td>

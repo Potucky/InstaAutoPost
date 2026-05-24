@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { Video, Clock, CheckCircle, AlertCircle, ArrowRight } from 'lucide-react'
+import { LayoutGrid, Clock, CheckCircle, AlertCircle, ArrowRight, CalendarCheck } from 'lucide-react'
 import { format, startOfDay } from 'date-fns'
 import { supabase } from '../lib/supabase'
 import StatusPill from '../components/StatusPill'
@@ -12,10 +12,11 @@ interface Stats {
   scheduled: number
   publishedToday: number
   failed: number
+  preparedUntilJul1: number
 }
 
 export default function Dashboard() {
-  const [stats, setStats] = useState<Stats>({ totalContent: 0, scheduled: 0, publishedToday: 0, failed: 0 })
+  const [stats, setStats] = useState<Stats>({ totalContent: 0, scheduled: 0, publishedToday: 0, failed: 0, preparedUntilJul1: 0 })
   const [recent, setRecent] = useState<QueueItem[]>([])
   const [nextItem, setNextItem] = useState<QueueItem | null | undefined>(undefined)
   const [loading, setLoading] = useState(true)
@@ -24,7 +25,7 @@ export default function Dashboard() {
     async function load() {
       const todayStart = startOfDay(new Date()).toISOString()
 
-      const [totalRes, scheduledRes, publishedRes, failedRes, recentRes, nextRes] = await Promise.all([
+      const [totalRes, scheduledRes, publishedRes, failedRes, preparedRes, recentRes, nextRes] = await Promise.all([
         supabase.from('ig_content_library').select('*', { count: 'exact', head: true }),
         supabase.from('ig_publishing_queue').select('*', { count: 'exact', head: true })
           .in('queue_status', ['scheduled', 'ready', 'retry_scheduled']),
@@ -32,6 +33,9 @@ export default function Dashboard() {
           .eq('queue_status', 'published').gte('published_at', todayStart),
         supabase.from('ig_publishing_queue').select('*', { count: 'exact', head: true })
           .eq('queue_status', 'failed'),
+        supabase.from('ig_publishing_queue').select('*', { count: 'exact', head: true })
+          .in('queue_status', ['scheduled', 'ready', 'retry_scheduled'])
+          .lt('scheduled_at', '2026-07-02T00:00:00.000Z'),
         supabase.from('ig_publishing_queue')
           .select('*, ig_content_library(id, title, video_url, content_status)')
           .order('updated_at', { ascending: false })
@@ -50,6 +54,7 @@ export default function Dashboard() {
         scheduled: scheduledRes.count ?? 0,
         publishedToday: publishedRes.count ?? 0,
         failed: failedRes.count ?? 0,
+        preparedUntilJul1: preparedRes.count ?? 0,
       })
       setRecent((recentRes.data ?? []) as QueueItem[])
       setNextItem(((nextRes.data ?? []) as QueueItem[])[0] ?? null)
@@ -59,10 +64,11 @@ export default function Dashboard() {
   }, [])
 
   const statCards = [
-    { label: 'Total Videos', value: stats.totalContent, icon: Video, color: 'text-violet-600', bg: 'bg-violet-50' },
+    { label: 'Total Content', value: stats.totalContent, icon: LayoutGrid, color: 'text-violet-600', bg: 'bg-violet-50' },
     { label: 'Queued / Scheduled', value: stats.scheduled, icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
     { label: 'Published Today', value: stats.publishedToday, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     { label: 'Failed', value: stats.failed, icon: AlertCircle, color: 'text-red-600', bg: 'bg-red-50' },
+    { label: 'Prepared ≤ Jul 1', value: stats.preparedUntilJul1, icon: CalendarCheck, color: 'text-teal-600', bg: 'bg-teal-50' },
   ]
 
   return (
@@ -76,7 +82,7 @@ export default function Dashboard() {
         <WorkflowDisabledBanner />
 
         {/* Stats */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           {statCards.map(({ label, value, icon: Icon, color, bg }) => (
             <div key={label} className="stat-card flex items-start gap-4">
               <div className={`w-10 h-10 rounded-xl ${bg} flex items-center justify-center shrink-0`}>
@@ -133,7 +139,7 @@ export default function Dashboard() {
             <table className="w-full">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="table-th">Video</th>
+                  <th className="table-th">Content</th>
                   <th className="table-th">Status</th>
                   <th className="table-th">Scheduled</th>
                   <th className="table-th">Published</th>
