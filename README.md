@@ -25,7 +25,7 @@ It is not QA Automation, not QA Content Automation, and not an old Instagram pro
 | Frontend | Vite + React + TypeScript | Manage content, queue, calendar, and logs. Never publishes directly. |
 | Database | Supabase PostgreSQL | Source of truth for content, queue state, attempts, locks, and completion proof. |
 | Worker | `scripts/instaautopost_publisher.py` | Owns Instagram Graph API publishing. Dry-run by default. |
-| Automation | `.github/workflows/instaautopost-publisher.yml` | Manual worker execution. Automatic schedule is currently disabled. |
+| Automation | `.github/workflows/instaautopost-publisher.yml` | YAML defines a 5-minute cron and manual dispatch; entire workflow is currently manually disabled in GitHub Actions for safety. |
 | External API | Instagram Graph API | Receives live publish requests only when explicitly enabled. |
 
 ## Project Structure
@@ -167,6 +167,6 @@ Live-only env vars:
 
 ## Automation
 
-The GitHub Actions workflow keeps manual `workflow_dispatch`.
+The GitHub Actions workflow defines a 5-minute cron schedule (`*/5 * * * *`) and manual `workflow_dispatch`.
 
-Automatic cron scheduling is currently commented out in `.github/workflows/instaautopost-publisher.yml` to stop failure email spam. Restore it only after safety blockers are resolved and the user explicitly asks.
+The entire `instaautopost-publisher.yml` workflow is currently manually disabled in GitHub Actions for safety. While disabled, neither the cron nor `workflow_dispatch` is available — GitHub will not execute the workflow in either mode. Re-enabling the workflow also re-enables the 5-minute cron. When enabled, the workflow always runs live (`INSTAGRAM_API_ENABLED=true`), so eligible due queue items will publish to Instagram. Do not re-enable without resolving the safety blockers in `docs/ROADMAP.md` and explicit authorization.
