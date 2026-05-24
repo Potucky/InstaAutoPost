@@ -558,8 +558,17 @@ def _process_live(
     except Exception as exc:
         duration_ms = int((time.monotonic() - start_time) * 1000)
         error_str = _redact(str(exc), access_token)
-        log.error(f"Publish failed (pre-media_id): {error_str}")
         ig_error_data: Optional[dict] = getattr(exc, "response_data", None)
+        if ig_error_data:
+            log.error("IG API error body: %s", ig_error_data)
+            ig_detail_parts = [
+                f"{k}={ig_error_data[k]!r}"
+                for k in ("message", "code", "type", "error_subcode", "fbtrace_id")
+                if ig_error_data.get(k) is not None
+            ]
+            if ig_detail_parts:
+                error_str = error_str + " | " + " | ".join(ig_detail_parts)
+        log.error(f"Publish failed (pre-media_id): {error_str}")
         write_attempt(
             supabase,
             queue_id=queue_id,
